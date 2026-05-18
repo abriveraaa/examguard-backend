@@ -28,7 +28,7 @@ public interface StudentExamRepository extends JpaRepository<Exam, Long> {
             THEN CONCAT(fp.firstName, ' ', fp.lastName)
             ELSE 'Faculty'
         END,
-
+        COUNT(DISTINCT q.questionId),
         e.timeLimitMinutes,
         e.startDateTime,
         e.endDateTime,
@@ -40,30 +40,41 @@ public interface StudentExamRepository extends JpaRepository<Exam, Long> {
     )
 
     FROM ExamAssignment ea
-
     JOIN ea.exam e
-
+    LEFT JOIN e.questions q
     JOIN ClassEnrollmentCache ce
         ON ce.classOfferingId = ea.classOfferingId
-
     JOIN ClassOfferingCache co
         ON co.classOfferingId = ea.classOfferingId
-
     LEFT JOIN FacultyLoadCache fl
         ON fl.classOfferingId = ea.classOfferingId
-
     LEFT JOIN FacultyProfileCache fp
         ON fp.employeeId = fl.employeeId
-
     LEFT JOIN ExamAttempt a
         ON a.examId = e.examId
        AND a.studentId = ce.studentId
-
     WHERE ce.studentId = :studentId
       AND e.published = true
       AND e.status <>
           com.example.backend.entity.enums.ExamStatus.CANCELLED
-
+    GROUP BY
+            e.examId,
+            e.title,
+            co.courseCode,
+            co.courseDescription,
+            co.term,
+            co.academicYear,
+            co.status,
+            e.examMode,
+            fp.employeeId,
+            fp.firstName,
+            fp.lastName,
+            e.timeLimitMinutes,
+            e.startDateTime,
+            e.endDateTime,
+            a.status,
+            a.reviewStatus,
+            e.resultsReleased
     ORDER BY e.startDateTime ASC
 """)
     List<StudentExamCardDTO> findStudentExamCards(

@@ -19,6 +19,7 @@ public class StudentExamCardDTO {
     private String classOfferingStatus;
     private String mode;
     private String faculty;
+    private Long questionCount;
     private Integer durationMinutes;
     private OffsetDateTime startDateTime;
     private OffsetDateTime endDateTime;
@@ -38,6 +39,7 @@ public class StudentExamCardDTO {
             String classOfferingStatus,
             String mode,
             String faculty,
+            Long questionCount,
             Integer durationMinutes,
             OffsetDateTime startDateTime,
             OffsetDateTime endDateTime,
@@ -54,6 +56,7 @@ public class StudentExamCardDTO {
         this.classOfferingStatus = classOfferingStatus;
         this.mode = mode;
         this.faculty = faculty;
+        this.questionCount = questionCount;
         this.durationMinutes = durationMinutes;
         this.startDateTime = startDateTime;
         this.endDateTime = endDateTime;
