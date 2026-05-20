@@ -29,7 +29,7 @@ public class ExamCameraSession {
     @Column(name = "pairing_token", nullable = false, unique = true, length = 120)
     private String pairingToken;
 
-    @Column(name = "device_label", length = 100)
+    @Column(name = "device_label")
     private String deviceLabel;
 
     @Column(name = "device_type", nullable = false, length = 30)
