@@ -17,6 +17,11 @@ public class ViolationLogRequest {
     private String severity;
     private String violationMessage;
 
+    private String evidenceUrl;
+    private String evidenceType;
+    private String evidenceSource;
+    private String evidenceMetadata;
+
     private Integer attemptNumber;
     private OffsetDateTime occurredAt;
 

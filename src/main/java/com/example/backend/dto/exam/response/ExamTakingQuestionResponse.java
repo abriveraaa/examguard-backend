@@ -19,6 +19,8 @@ public class ExamTakingQuestionResponse {
     private List<ExamTakingChoiceResponse> choices;
     private String questionInstruction;
     private List<EssayRubricRequest> rubrics;
+    private Long selectedChoiceId;
+    private String studentAnswer;
 
     public ExamTakingQuestionResponse(
             Long questionId,

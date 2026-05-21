@@ -1,8 +1,11 @@
 package com.example.backend.entity.exam;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -45,6 +48,16 @@ public class ExamViolationLog {
     @Column(name = "evidence_url")
     private String evidenceUrl;
 
+    @Column(name = "evidence_type", length = 50)
+    private String evidenceType = "NONE";
+
+    @Column(name = "evidence_source", length = 50)
+    private String evidenceSource = "SYSTEM";
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "evidence_metadata", columnDefinition = "jsonb")
+    private JsonNode evidenceMetadata;
+
     @Column(name = "review_status")
     private String reviewStatus = "PENDING_REVIEW";
 
@@ -82,5 +95,14 @@ public class ExamViolationLog {
         if (attemptNumber == null) {
             attemptNumber = 1;
         }
+        if (evidenceType == null || evidenceType.isBlank()) {
+            evidenceType = "NONE";
+        }
+
+        if (evidenceSource == null || evidenceSource.isBlank()) {
+            evidenceSource = "SYSTEM";
+        }
     }
+
+
 }

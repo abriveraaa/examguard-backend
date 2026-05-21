@@ -22,6 +22,11 @@ public class ExamTakingResponse {
     private ExamMode examMode;
     private List<ExamTakingQuestionResponse> questions;
     private List<ViolationSettingRequest> violationSettings;
+    private OffsetDateTime serverNow;
+    private OffsetDateTime lobbyOpenAt;
+    private OffsetDateTime attemptStartedAt;
+    private Boolean canBeginExam;
+    private Long remainingSeconds;
 
     public ExamTakingResponse(
             Long attemptId,

@@ -146,6 +146,26 @@ public class ExamController {
         }
     }
 
+    @PostMapping("/evidence/upload")
+    public ResponseEntity<ImageUploadResponse> uploadEvidence(
+            @RequestParam("file") MultipartFile file
+    ){
+        try{
+            ImageUploadResponse response = examService.uploadViolationEvidence(file);
+
+            if (!response.isSuccess()) {
+                return ResponseEntity.badRequest().body(response);
+            }
+            return ResponseEntity.ok(response);
+        }catch (Exception e){
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body(
+                    new ImageUploadResponse(false, "Failed to upload image.", null)
+            );
+        }
+
+    }
+
     // =========================
     // CREATE
     // =========================
@@ -211,6 +231,18 @@ public class ExamController {
     ) {
         ExamTakingResponse response =
                 examService.getExamForTaking(examId, schoolId, role);
+
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{examId}/begin")
+    public ResponseEntity<?> beginExam(
+            @PathVariable Long examId,
+            @RequestHeader("X-User-Id") String schoolId,
+            @RequestHeader("X-Role") String role
+    ) {
+        ExamTakingResponse response =
+                examService.beginExamAttempt(examId, schoolId, role);
 
         return ResponseEntity.ok(response);
     }

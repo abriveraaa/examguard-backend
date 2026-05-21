@@ -24,6 +24,8 @@ import com.example.backend.repository.core.AdminProfileRepository;
 import com.example.backend.repository.core.UserAccessRepository;
 import com.example.backend.entity.enums.ExamStatus;
 import com.example.backend.service.core.EmailService;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import net.coobird.thumbnailator.Thumbnails;
 import org.jspecify.annotations.NonNull;
@@ -256,6 +258,26 @@ public class ExamService {
         log.setSeverity(request.getSeverity());
         log.setViolationMessage(request.getViolationMessage());
         log.setAttemptNumber(request.getAttemptNumber());
+        log.setEvidenceUrl(request.getEvidenceUrl());
+        log.setEvidenceType(request.getEvidenceType());
+        log.setEvidenceSource(request.getEvidenceSource());
+
+        try {
+
+            if (request.getEvidenceMetadata() != null
+                    && !request.getEvidenceMetadata().isBlank()) {
+
+                ObjectMapper mapper = new ObjectMapper();
+
+                JsonNode metadataNode =
+                        mapper.readTree(request.getEvidenceMetadata());
+
+                log.setEvidenceMetadata(metadataNode);
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         log.setOccurredAt(
                 request.getOccurredAt() == null
                         ? OffsetDateTime.now(ZoneOffset.UTC)
@@ -1320,6 +1342,55 @@ public class ExamService {
         }
     }
 
+    public ImageUploadResponse uploadViolationEvidence(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            return new ImageUploadResponse(false, "Evidence file is empty.", null);
+        }
+
+        String contentType = file.getContentType();
+
+        if (contentType == null || !contentType.startsWith("image/")) {
+            return new ImageUploadResponse(false, "Only image files are allowed.", null);
+        }
+
+        try {
+            String uploadDir = System.getProperty("user.dir") + "/uploads/evidence/";
+
+            File directory = new File(uploadDir);
+
+            if (!directory.exists()) {
+                boolean created = directory.mkdirs();
+                if (!created) {
+                    return new ImageUploadResponse(false, "Failed to create evidence directory.", null);
+                }
+            }
+
+            String originalFilename = file.getOriginalFilename();
+            String extension = ".jpg";
+
+            if (originalFilename != null && originalFilename.contains(".")) {
+                extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+            }
+
+            String filename = "evidence-" + UUID.randomUUID() + extension;
+
+            File destination = new File(directory, filename);
+
+            Thumbnails.of(file.getInputStream())
+                    .size(1200, 1200)
+                    .outputQuality(0.85)
+                    .toFile(destination);
+
+            String imageUrl = "/uploads/evidence/" + filename;
+
+            return new ImageUploadResponse(true, "Evidence uploaded successfully.", imageUrl);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new ImageUploadResponse(false, "Failed to save evidence.", null);
+        }
+    }
+
     public ExamTakingResponse getExamForTaking(
             Long examId,
             String schoolId,
@@ -1335,6 +1406,273 @@ public class ExamService {
         Exam exam = rawContent.getExam();
         List<ExamQuestion> dbQuestions = rawContent.getQuestions();
         Map<Long, List<ExamChoice>> choiceMap = rawContent.getChoiceMap();
+
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+
+        OffsetDateTime examStart = exam.getStartDateTime();
+        OffsetDateTime examEnd = exam.getEndDateTime();
+
+        if (examStart == null || examEnd == null) {
+            throw new RuntimeException("Exam schedule is invalid.");
+        }
+
+        OffsetDateTime lobbyOpenAt = examStart.minusMinutes(15);
+
+        if (now.isBefore(lobbyOpenAt)) {
+            throw new RuntimeException("Lobby will open 15 minutes before the exam starts.");
+        }
+
+        if (!now.isBefore(examEnd)) {
+            throw new RuntimeException("This exam has already ended.");
+        }
+
+        boolean canBeginExam = !now.isBefore(examStart);
+
+        Optional<ExamAttempt> existingAttempt =
+                attemptRepository.findByExamIdAndStudentId(examId, schoolId);
+
+        ExamAttempt attempt;
+
+        if (existingAttempt.isPresent()) {
+            attempt = existingAttempt.get();
+
+            if (attempt.getStatus() != ExamAttemptStatus.IN_PROGRESS) {
+                throw new RuntimeException("This exam attempt is already submitted.");
+            }
+
+        } else {
+            attempt = null;
+        }
+
+
+        int timeLimitMinutes =
+                exam.getTimeLimitMinutes() == null
+                        ? 60
+                        : exam.getTimeLimitMinutes();
+
+        OffsetDateTime effectiveExpireAt =
+                exam.getExamMode() == ExamMode.SYNCHRONOUS
+                        ? examStart.plusMinutes(timeLimitMinutes)
+                        : examEnd;
+
+        if (exam.getExamMode() == ExamMode.ASYNCHRONOUS && !now.isBefore(examEnd)) {
+            throw new RuntimeException("This exam has already ended.");
+        }
+
+        long remainingSeconds = timeLimitMinutes * 60L;
+
+        OffsetDateTime timerStartedAt = null;
+
+        if (attempt != null && attempt.getStartedAt() != null) {
+            if (exam.getExamMode() == ExamMode.SYNCHRONOUS) {
+                timerStartedAt = examStart;
+            } else {
+                timerStartedAt = attempt.getStartedAt();
+            }
+        }
+
+        if (timerStartedAt != null) {
+            long elapsedSeconds =
+                    java.time.Duration.between(timerStartedAt, now).getSeconds();
+
+            remainingSeconds =
+                    Math.max(0, (timeLimitMinutes * 60L) - elapsedSeconds);
+        }
+
+        List<ExamQuestion> finalQuestions;
+
+        if (attempt != null && attempt.getQuestionOrder() != null) {
+            List<Long> savedQuestionOrder = fromJsonList(attempt.getQuestionOrder());
+            finalQuestions = applyQuestionOrder(dbQuestions, savedQuestionOrder);
+        } else {
+            finalQuestions = dbQuestions;
+        }
+
+        final Map<Long, List<Long>> savedChoiceOrderMap;
+
+        if (attempt != null) {
+
+            savedChoiceOrderMap =
+                    attemptChoiceOrderRepository.findByAttemptId(
+                                    attempt.getAttemptId()
+                            )
+                            .stream()
+                            .collect(Collectors.toMap(
+                                    ExamAttemptChoiceOrder::getQuestionId,
+                                    item -> fromJsonList(item.getChoiceOrder())
+
+                            ));
+
+        } else {
+
+            savedChoiceOrderMap = new HashMap<>();
+        }
+
+        final Map<Long, ExamAnswer> savedAnswerMap;
+
+        if (attempt != null) {
+            savedAnswerMap =
+                    answerRepository.findByAttemptAttemptId(attempt.getAttemptId())
+                            .stream()
+                            .collect(Collectors.toMap(
+                                    answer -> answer.getQuestion().getQuestionId(),
+                                    answer -> answer,
+                                    (existing, duplicate) -> existing
+                            ));
+        } else {
+            savedAnswerMap = new HashMap<>();
+        }
+
+        List<Long> questionIds = dbQuestions.stream()
+                .map(ExamQuestion::getQuestionId)
+                .toList();
+
+        List<EssayRubric> allRubrics = questionIds.isEmpty()
+                ? List.of()
+                : essayRubricRepository.findByQuestionQuestionIdInOrderByQuestionQuestionIdAscDisplayOrderAsc(questionIds);
+
+        Map<Long, List<EssayRubric>> rubricMap =
+                allRubrics.stream()
+                        .collect(Collectors.groupingBy(r -> r.getQuestion().getQuestionId()));
+
+        List<ExamTakingQuestionResponse> questionResponses =
+                finalQuestions.stream()
+                        .map(question -> {
+
+                            List<ExamChoice> choices = new ArrayList<>(
+                                    choiceMap.getOrDefault(
+                                            question.getQuestionId(),
+                                            new ArrayList<>()
+                                    )
+                            );
+
+                            List<Long> savedChoiceOrder =
+                                    savedChoiceOrderMap.get(question.getQuestionId());
+
+                            if (savedChoiceOrder != null) {
+                                choices = applyChoiceOrder(choices, savedChoiceOrder);
+                            }
+
+                            List<ExamTakingChoiceResponse> choiceResponses = new ArrayList<>();
+
+                            char label = 'A';
+
+                            for (ExamChoice choice : choices) {
+                                choiceResponses.add(new ExamTakingChoiceResponse(
+                                        choice.getChoiceId(),
+                                        String.valueOf(label++),
+                                        choice.getChoiceText(),
+                                        choice.getChoiceOrder(),
+                                        choice.getChoiceImageUrl()
+                                ));
+                            }
+
+                            ExamAnswer savedAnswer =
+                                    savedAnswerMap.get(question.getQuestionId());
+
+                            Long savedSelectedChoiceId =
+                                    savedAnswer != null && savedAnswer.getSelectedChoiceId() != null
+                                            ? savedAnswer.getSelectedChoiceId().getChoiceId()
+                                            : null;
+
+                            String savedStudentAnswer =
+                                    savedSelectedChoiceId != null
+                                            ? String.valueOf(savedSelectedChoiceId)
+                                            : savedAnswer == null
+                                              ? null
+                                              : savedAnswer.getAnswerText();
+
+                            ExamTakingQuestionResponse dto = new ExamTakingQuestionResponse(
+                                    question.getQuestionId(),
+                                    question.getQuestionType(),
+                                    question.getQuestionText(),
+                                    question.getQuestionImageUrl(),
+                                    question.getPoints(),
+                                    choiceResponses,
+                                    question.getQuestionInstruction(),
+                                    mapRubricsForTaking(
+                                            rubricMap.getOrDefault(
+                                                    question.getQuestionId(),
+                                                    List.of()
+                                            )
+                                    )
+                            );
+
+                            dto.setSelectedChoiceId(savedSelectedChoiceId);
+                            dto.setStudentAnswer(savedStudentAnswer);
+
+                            return dto;
+                        })
+                        .toList();
+
+        List<ExamViolationSetting> dbViolationSettings =
+                examViolationSettingRepository.findByExamExamId(examId);
+
+        List<ViolationSettingRequest> violationSettings =
+                dbViolationSettings.stream()
+                        .map(setting -> {
+                            ViolationSettingRequest dto = new ViolationSettingRequest();
+                            dto.setViolationType(setting.getViolationType());
+                            dto.setEnabled(setting.getEnabled());
+                            dto.setSeverity(setting.getSeverity());
+                            dto.setMaxAllowedCount(setting.getMaxAllowedCount());
+                            return dto;
+                        })
+                        .toList();
+
+        ExamTakingResponse response = new ExamTakingResponse(
+                attempt == null ? null : attempt.getAttemptId(),
+                exam.getExamId(),
+                exam.getTitle(),
+                exam.getDescription(),
+                timeLimitMinutes,
+                examStart,
+                examEnd,
+                exam.getExamMode(),
+                questionResponses,
+                violationSettings
+        );
+
+        response.setServerNow(now);
+        response.setLobbyOpenAt(lobbyOpenAt);
+        response.setAttemptStartedAt(attempt == null ? null : attempt.getStartedAt());
+        response.setCanBeginExam(canBeginExam);
+        response.setRemainingSeconds(remainingSeconds);
+
+        return response;
+    }
+
+    @Transactional
+    public ExamTakingResponse beginExamAttempt(
+            Long examId,
+            String schoolId,
+            String role
+    ) {
+        if (!"STUDENT".equalsIgnoreCase(role)) {
+            throw new RuntimeException("Only students can begin exams.");
+        }
+
+        Exam exam = examRepository
+                .findById(examId)
+                .orElseThrow(() -> new RuntimeException("Exam not found."));
+
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+
+        if (exam.getStartDateTime() == null || exam.getEndDateTime() == null) {
+            throw new RuntimeException("Exam schedule is invalid.");
+        }
+
+        if (!now.isBefore(exam.getEndDateTime())) {
+            throw new RuntimeException("This exam has already ended.");
+        }
+
+        if (exam.getExamMode() == ExamMode.SYNCHRONOUS
+                && now.isBefore(exam.getStartDateTime())) {
+            throw new RuntimeException("Exam has not started yet.");
+        }
+
+        ExamTakingRawContent rawContent =
+                examTakingCacheService.getRawContent(examId);
 
         Optional<ExamAttempt> existingAttempt =
                 attemptRepository.findByExamIdAndStudentId(examId, schoolId);
@@ -1352,111 +1690,45 @@ public class ExamService {
             attempt = createNewAttempt(
                     exam,
                     schoolId,
-                    dbQuestions,
-                    choiceMap
+                    rawContent.getQuestions(),
+                    rawContent.getChoiceMap()
             );
         }
 
-        List<Long> savedQuestionOrder = fromJsonList(attempt.getQuestionOrder());
+        if (exam.getExamMode() == ExamMode.SYNCHRONOUS) {
+            attempt.setStartedAt(exam.getStartDateTime());
+        } else {
+            if (attempt.getStartedAt() == null) {
+                attempt.setStartedAt(now);
+            }
+        }
 
-        List<ExamQuestion> finalQuestions =
-                applyQuestionOrder(dbQuestions, savedQuestionOrder);
+        attemptRepository.save(attempt);
 
-        Map<Long, List<Long>> savedChoiceOrderMap =
-                attemptChoiceOrderRepository.findByAttemptId(attempt.getAttemptId())
-                        .stream()
-                        .collect(Collectors.toMap(
-                                ExamAttemptChoiceOrder::getQuestionId,
-                                item -> fromJsonList(item.getChoiceOrder())
-                        ));
+        long elapsedSeconds =
+                java.time.Duration.between(
+                        attempt.getStartedAt(),
+                        now
+                ).getSeconds();
 
-        List<Long> questionIds = dbQuestions.stream()
-                .map(ExamQuestion::getQuestionId)
-                .toList();
+        int timeLimitMinutes =
+                exam.getTimeLimitMinutes() == null
+                        ? 60
+                        : exam.getTimeLimitMinutes();
 
-        List<EssayRubric> allRubrics = questionIds.isEmpty()
-                ? List.of()
-                : essayRubricRepository.findByQuestionQuestionIdInOrderByQuestionQuestionIdAscDisplayOrderAsc(questionIds);
+        long remainingSeconds =
+                Math.max(0, (timeLimitMinutes * 60L) - elapsedSeconds);
 
-        Map<Long, List<EssayRubric>> rubricMap = allRubrics.stream()
-                .collect(Collectors.groupingBy(r -> r.getQuestion().getQuestionId()));
+        ExamTakingResponse response =
+                getExamForTaking(examId, schoolId, role);
 
-        List<ExamTakingQuestionResponse> questionResponses = finalQuestions.stream()
-                .map(question -> {
+        response.setAttemptStartedAt(attempt.getStartedAt());
+        response.setAttemptId(attempt.getAttemptId());
+        response.setServerNow(now);
+        response.setCanBeginExam(true);
+        response.setRemainingSeconds(remainingSeconds);
 
-                    List<ExamChoice> choices = new ArrayList<>(
-                            choiceMap.getOrDefault(
-                                    question.getQuestionId(),
-                                    new ArrayList<>()
-                            )
-                    );
-
-                    List<Long> savedChoiceOrder =
-                            savedChoiceOrderMap.get(question.getQuestionId());
-
-                    if (savedChoiceOrder != null) {
-                        choices = applyChoiceOrder(choices, savedChoiceOrder);
-                    }
-
-                    List<ExamTakingChoiceResponse> choiceResponses = new ArrayList<>();
-
-                    char label = 'A';
-
-                    for (ExamChoice choice : choices) {
-                        choiceResponses.add(new ExamTakingChoiceResponse(
-                                choice.getChoiceId(),
-                                String.valueOf(label++),
-                                choice.getChoiceText(),
-                                choice.getChoiceOrder(),
-                                choice.getChoiceImageUrl()
-                        ));
-                    }
-
-                    return new ExamTakingQuestionResponse(
-                            question.getQuestionId(),
-                            question.getQuestionType(),
-                            question.getQuestionText(),
-                            question.getQuestionImageUrl(),
-                            question.getPoints(),
-                            choiceResponses,
-                            question.getQuestionInstruction(),
-                            mapRubricsForTaking(
-                                    rubricMap.getOrDefault(
-                                            question.getQuestionId(),
-                                            List.of()
-                                    )
-                            )
-                    );
-                })
-                .toList();
-
-        List<ExamViolationSetting> dbViolationSettings =
-                examViolationSettingRepository.findByExamExamId(examId);
-
-        List<ViolationSettingRequest> violationSettings =
-                dbViolationSettings.stream()
-                        .map(setting -> {
-                            ViolationSettingRequest dto = new ViolationSettingRequest();
-                            dto.setViolationType(setting.getViolationType());
-                            dto.setEnabled(setting.getEnabled());
-                            dto.setSeverity(setting.getSeverity());
-                            dto.setMaxAllowedCount(setting.getMaxAllowedCount());
-                            return dto;
-                        })
-                        .toList();
-
-        return new ExamTakingResponse(
-                attempt.getAttemptId(),
-                exam.getExamId(),
-                exam.getTitle(),
-                exam.getDescription(),
-                exam.getTimeLimitMinutes(),
-                exam.getStartDateTime(),
-                exam.getEndDateTime(),
-                exam.getExamMode(),
-                questionResponses,
-                violationSettings
-        );
+        return response;
     }
 
     private List<EssayRubricRequest> mapRubricsForTaking(List<EssayRubric> rubrics) {
@@ -1742,7 +2014,7 @@ public class ExamService {
         attempt.setExamId(exam.getExamId());
         attempt.setStudentId(username);
         attempt.setStatus(ExamAttemptStatus.IN_PROGRESS);
-        attempt.setStartedAt(OffsetDateTime.now());
+        attempt.setStartedAt(OffsetDateTime.now(ZoneOffset.UTC));
         attempt.setQuestionOrder(toJsonList(finalQuestionIds));
 
         attempt = attemptRepository.save(attempt);
