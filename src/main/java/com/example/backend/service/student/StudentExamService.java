@@ -1,6 +1,7 @@
 package com.example.backend.service.student;
 
 import com.example.backend.dto.student.StudentExamCardDTO;
+import com.example.backend.entity.enums.ExamMode;
 import com.example.backend.repository.core.StudentExamRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -39,16 +40,40 @@ public class StudentExamService {
             return "RESULTS RELEASED";
         }
 
-        if ("SUBMITTED".equalsIgnoreCase(attemptStatus) || "AUTO_SUBMITTED".equalsIgnoreCase(attemptStatus)) {
+        if ("SUBMITTED".equalsIgnoreCase(attemptStatus)
+                || "AUTO_SUBMITTED".equalsIgnoreCase(attemptStatus)) {
             return "PENDING REVIEW";
         }
 
-        if (!now.isBefore(exam.getStartDateTime()) && !now.isAfter(exam.getEndDateTime())) {
-            return "ONGOING";
+        OffsetDateTime start = exam.getStartDateTime();
+        OffsetDateTime end = exam.getEndDateTime();
+
+        if (start == null || end == null) {
+            return "UPCOMING";
         }
 
-        if (now.isBefore(exam.getStartDateTime())) {
+        int durationMinutes =
+                exam.getDurationMinutes() == null
+                        ? 60
+                        : exam.getDurationMinutes();
+
+        OffsetDateTime effectiveEnd =
+                exam.getMode() == ExamMode.SYNCHRONOUS
+                        ? start.plusMinutes(durationMinutes)
+                        : end;
+
+        if (now.isBefore(start)) {
             return "UPCOMING";
+        }
+
+        if ("IN_PROGRESS".equalsIgnoreCase(attemptStatus)) {
+            return now.isBefore(effectiveEnd)
+                    ? "ONGOING"
+                    : "DID NOT TAKE";
+        }
+
+        if (now.isBefore(effectiveEnd)) {
+            return "ONGOING";
         }
 
         return "DID NOT TAKE";

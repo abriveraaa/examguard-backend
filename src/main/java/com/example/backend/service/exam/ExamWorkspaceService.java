@@ -4,6 +4,7 @@ import com.example.backend.audit.TrackActivity;
 import com.example.backend.dto.exam.request.EssayRubricRequest;
 import com.example.backend.dto.exam.response.EssayRubricScoreResponse;
 import com.example.backend.dto.faculty.*;
+import com.example.backend.dto.faculty.response.AnswerReviewTimelineDTO;
 import com.example.backend.dto.faculty.response.FacultyAttemptReviewResponse;
 import com.example.backend.dto.faculty.response.FacultyExamDetailResponse;
 import com.example.backend.dto.faculty.response.SimpleMessageResponse;
@@ -30,8 +31,17 @@ public class ExamWorkspaceService {
     private final EssayRubricScoreRepository rubricScoreRepository;
     private final SystemActivityLogService activityLogService;
     private final ExamWorkspaceRepository examWorkspaceRepository;
+    private final ExamAnswerReviewLogRepository reviewLogRepository;
 
-    public ExamWorkspaceService(ExamRepository examRepository, ExamQuestionRepository examQuestionRepository, ExamAnswerRepository examAnswerRepository, ExamAttemptRepository examAttemptRepository, EssayRubricRepository essayRubricRepository, EssayRubricScoreRepository rubricScoreRepository, SystemActivityLogService activityLogService, ExamWorkspaceRepository examWorkspaceRepository) {
+    public ExamWorkspaceService(ExamRepository examRepository,
+                                ExamQuestionRepository examQuestionRepository,
+                                ExamAnswerRepository examAnswerRepository,
+                                ExamAttemptRepository examAttemptRepository,
+                                EssayRubricRepository essayRubricRepository,
+                                EssayRubricScoreRepository rubricScoreRepository,
+                                SystemActivityLogService activityLogService,
+                                ExamWorkspaceRepository examWorkspaceRepository,
+                                ExamAnswerReviewLogRepository reviewLogRepository) {
         this.examRepository = examRepository;
         this.examQuestionRepository = examQuestionRepository;
         this.examAnswerRepository = examAnswerRepository;
@@ -40,6 +50,7 @@ public class ExamWorkspaceService {
         this.rubricScoreRepository = rubricScoreRepository;
         this.activityLogService = activityLogService;
         this.examWorkspaceRepository = examWorkspaceRepository;
+        this.reviewLogRepository = reviewLogRepository;
     }
 
     @TrackActivity(
@@ -156,6 +167,10 @@ public class ExamWorkspaceService {
                 throw new RuntimeException("Exam not found or access denied.");
             }
 
+            BigDecimal scoreBefore = answer.getPointsAwarded() == null
+                    ? BigDecimal.ZERO
+                    : answer.getPointsAwarded();
+
             BigDecimal maxPoints = answer.getQuestion().getPoints();
 
             if (maxPoints == null) {
@@ -199,6 +214,29 @@ public class ExamWorkspaceService {
             answer.setUpdatedAt(OffsetDateTime.now());
 
             examAnswerRepository.save(answer);
+
+            ExamAnswerReviewLog log = new ExamAnswerReviewLog();
+
+            log.setExam(answer.getQuestion().getExam());
+            log.setAttempt(attempt);
+            log.setAnswer(answer);
+            log.setQuestion(answer.getQuestion());
+            log.setViolation(null);
+
+            log.setActionType("SCORE_UPDATED");
+            log.setPreviousValue(formatScoreValue(scoreBefore));
+            log.setNewValue(formatScoreValue(pointsAwarded));
+
+            log.setScoreBefore(scoreBefore);
+            log.setScoreAfter(pointsAwarded);
+            log.setDeduction(BigDecimal.ZERO);
+
+            log.setNotes("Manual score update.");
+
+            log.setCreatedBy(employeeId);
+            log.setCreatedByRole(role);
+
+            reviewLogRepository.save(log);
 
             BigDecimal totalScore =
                     examAnswerRepository.sumPointsAwardedByAttemptId(
@@ -393,6 +431,29 @@ public class ExamWorkspaceService {
                 employeeId,
                 role
         );
+    }
+
+    // =========================================================
+    // TIMELINE
+    // =========================================================
+
+    public List<AnswerReviewTimelineDTO> getAnswerReviewTimeline(
+            Long answerId,
+            String employeeId,
+            String role
+    ) {
+        validateRole(role);
+
+        ExamAnswer answer = examAnswerRepository.findById(answerId)
+                .orElseThrow(() -> new RuntimeException("Answer not found."));
+
+        Long examId = answer.getAttempt().getExamId();
+
+        if (!examWorkspaceRepository.canAccessExam(examId, employeeId, role)) {
+            throw new RuntimeException("Access denied.");
+        }
+
+        return reviewLogRepository.findTimelineByAnswerId(answerId);
     }
 
     // =========================================================
@@ -804,5 +865,13 @@ public class ExamWorkspaceService {
 
             examAttemptRepository.save(attempt);
         }
+    }
+
+    private String formatScoreValue(BigDecimal value) {
+        if (value == null) {
+            return "0.00";
+        }
+
+        return value.setScale(2, RoundingMode.HALF_UP).toPlainString();
     }
 }

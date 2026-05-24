@@ -36,7 +36,7 @@ public class ExamAttempt {
     @Column(name = "status", nullable = false)
     private ExamAttemptStatus status = ExamAttemptStatus.IN_PROGRESS;
 
-    @Column(name = "started_at", nullable = false)
+    @Column(name = "started_at")
     private OffsetDateTime startedAt = OffsetDateTime.now();
 
     @Column(name = "submitted_at")

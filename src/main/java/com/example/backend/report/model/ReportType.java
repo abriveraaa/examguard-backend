@@ -5,5 +5,6 @@ public enum ReportType {
     STUDENT_ANSWER,
     LEADERBOARD,
     VIOLATION_REPORT,
-    ACTIVITY_LOG
+    ACTIVITY_LOG,
+    EXAM_RESULT_SUMMARY
 }

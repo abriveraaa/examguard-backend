@@ -4,5 +4,7 @@ public enum ExamAttemptStatus {
     IN_PROGRESS,
     SUBMITTED,
     AUTO_SUBMITTED,
-    CANCELLED
+    CANCELLED,
+    DID_NOT_TAKE,
+    DID_NOT_SUBMIT
 }

@@ -28,10 +28,32 @@ public class ReportExportService {
     public ReportExportResult generateExamPortfolioPdf(
             Long examId,
             ReportExportMode mode,
+            String classOfferingId,
             String generatedByText
     ) {
         if (mode == ReportExportMode.SEPARATE) {
-            return generateSeparateClassReportsZip(examId, generatedByText);
+
+            if (classOfferingId != null && !classOfferingId.isBlank()) {
+                byte[] pdf = generateExamPortfolioPdfByClass(
+                        examId,
+                        classOfferingId,
+                        generatedByText
+                );
+
+                return new ReportExportResult(
+                        pdf,
+                        safeFileName(getExamTitle(examId)) +
+                                "_" +
+                                safeFileName(classOfferingId) +
+                                ".pdf",
+                        MediaType.APPLICATION_PDF
+                );
+            }
+
+            return generateSeparateClassReportsZip(
+                    examId,
+                    generatedByText
+            );
         }
 
         byte[] pdf = generateExamPortfolioPdfByClass(

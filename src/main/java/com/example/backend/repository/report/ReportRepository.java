@@ -221,6 +221,7 @@ public interface ReportRepository extends Repository<Exam, Long> {
     @Query("""
     SELECT new com.example.backend.report.exam.dto.ReportStudentAnswerDTO(
         a.attemptId,
+        ans.answerId,
         s.studentId,
         CONCAT(s.firstName, ' ', s.lastName),
         q.questionId,
@@ -317,5 +318,264 @@ public interface ReportRepository extends Repository<Exam, Long> {
     String findStudentClassOfferingIdForExam(
             @Param("examId") Long examId,
             @Param("studentId") String studentId
+    );
+
+    @Query(value = """
+        WITH assigned AS (
+            SELECT DISTINCT ce.student_id
+            FROM exam_assignment ea
+            JOIN class_enrollment_cache ce ON ce.class_offering_id = ea.class_offering_id AND UPPER(ce.status) = 'ENROLLED'
+            WHERE ea.exam_id = :examId
+              AND (:classOfferingId IS NULL OR ea.class_offering_id = :classOfferingId)
+        ),
+        attempts AS (
+            SELECT
+                a.student_id,
+                a.attempt_id,
+                a.status,
+                a.total_score,
+                a.score_percentage
+            FROM exam_attempt a
+            WHERE a.exam_id = :examId
+        ),
+        joined_data AS (
+            SELECT
+                ass.student_id,
+                at.attempt_id,
+                COALESCE(CAST(at.status AS TEXT), 'DID_NOT_TAKE') AS attempt_status,
+                at.total_score,
+                at.score_percentage
+            FROM assigned ass
+            LEFT JOIN attempts at
+                ON at.student_id = ass.student_id
+        ),
+        violation_students AS (
+            SELECT DISTINCT a.student_id
+            FROM exam_violation_log v
+            JOIN exam_attempt a
+                ON a.attempt_id = v.attempt_id
+            JOIN exam_assignment ea
+                ON ea.exam_id = v.exam_id
+            JOIN class_enrollment_cache ce
+                ON ce.class_offering_id = ea.class_offering_id
+               AND ce.student_id = a.student_id
+               AND UPPER(ce.status) = 'ENROLLED'
+            WHERE v.exam_id = :examId
+              AND (:classOfferingId IS NULL OR ea.class_offering_id = :classOfferingId)
+            )
+        SELECT
+            COUNT(*) AS assigned_students,
+
+            SUM(CASE WHEN attempt_status = 'SUBMITTED' THEN 1 ELSE 0 END) AS submitted,
+
+            SUM(CASE WHEN attempt_status = 'AUTO_SUBMITTED' THEN 1 ELSE 0 END) AS auto_submitted,
+
+            SUM(CASE WHEN attempt_status = 'DID_NOT_TAKE' THEN 1 ELSE 0 END) AS did_not_take,
+
+            COALESCE(
+                (
+                    SUM(
+                        CASE
+                            WHEN attempt_status IN ('SUBMITTED', 'AUTO_SUBMITTED')
+                            THEN 1 ELSE 0
+                        END
+                    ) * 100.0
+                ) / NULLIF(COUNT(*), 0),
+                0
+            ) AS submission_rate,
+
+            COALESCE(AVG(total_score) FILTER (
+                WHERE attempt_status IN ('SUBMITTED', 'AUTO_SUBMITTED')
+            ), 0) AS average_score,
+
+            COALESCE(AVG(score_percentage) FILTER (
+                WHERE attempt_status IN ('SUBMITTED', 'AUTO_SUBMITTED')
+            ), 0) AS average_percentage,
+
+            COALESCE(MAX(total_score) FILTER (
+                WHERE attempt_status IN ('SUBMITTED', 'AUTO_SUBMITTED')
+            ), 0) AS highest_score,
+
+            COALESCE(MAX(score_percentage) FILTER (
+                WHERE attempt_status IN ('SUBMITTED', 'AUTO_SUBMITTED')
+            ), 0) AS highest_percentage,
+
+            COALESCE(MIN(total_score) FILTER (
+                WHERE attempt_status IN ('SUBMITTED', 'AUTO_SUBMITTED')
+            ), 0) AS lowest_score,
+
+            COALESCE(MIN(score_percentage) FILTER (
+                WHERE attempt_status IN ('SUBMITTED', 'AUTO_SUBMITTED')
+            ), 0) AS lowest_percentage,
+
+            COALESCE(
+                (
+                    SUM(
+                        CASE
+                            WHEN score_percentage >= 60
+                             AND attempt_status IN ('SUBMITTED', 'AUTO_SUBMITTED')
+                            THEN 1 ELSE 0
+                        END
+                    ) * 100.0
+                )
+                / NULLIF(
+                    SUM(
+                        CASE
+                            WHEN attempt_status IN ('SUBMITTED', 'AUTO_SUBMITTED')
+                            THEN 1 ELSE 0
+                        END
+                    ),
+                    0
+                ),
+                0
+            ) AS passing_rate,
+
+            COUNT(DISTINCT vs.student_id) AS with_violations
+
+        FROM joined_data jd
+        LEFT JOIN violation_students vs
+            ON vs.student_id = jd.student_id
+        """, nativeQuery = true)
+    Object[] findExamResultSummaryMetricsRaw(
+            @Param("examId") Long examId,
+            @Param("classOfferingId") String classOfferingId
+    );
+
+
+    @Query(value = """
+    WITH submitted_attempts AS (
+        SELECT
+            a.score_percentage
+        FROM exam_attempt a
+        JOIN exam_assignment ea
+            ON ea.exam_id = a.exam_id
+        JOIN class_enrollment_cache ce
+            ON ce.class_offering_id = ea.class_offering_id
+           AND ce.student_id = a.student_id
+           AND UPPER(ce.status) = 'ENROLLED'
+        WHERE a.exam_id = :examId
+          AND a.status IN ('SUBMITTED', 'AUTO_SUBMITTED')
+          AND (:classOfferingId IS NULL OR ea.class_offering_id = :classOfferingId)
+    )
+    SELECT '0-20%' AS range_label,
+           COUNT(*) FILTER (WHERE score_percentage >= 0 AND score_percentage <= 20) AS student_count
+    FROM submitted_attempts
+
+    UNION ALL
+
+    SELECT '21-40%' AS range_label,
+           COUNT(*) FILTER (WHERE score_percentage > 20 AND score_percentage <= 40) AS student_count
+    FROM submitted_attempts
+
+    UNION ALL
+
+    SELECT '41-60%' AS range_label,
+           COUNT(*) FILTER (WHERE score_percentage > 40 AND score_percentage <= 60) AS student_count
+    FROM submitted_attempts
+
+    UNION ALL
+
+    SELECT '61-80%' AS range_label,
+           COUNT(*) FILTER (WHERE score_percentage > 60 AND score_percentage <= 80) AS student_count
+    FROM submitted_attempts
+
+    UNION ALL
+
+    SELECT '81-100%' AS range_label,
+           COUNT(*) FILTER (WHERE score_percentage > 80 AND score_percentage <= 100) AS student_count
+    FROM submitted_attempts
+    """, nativeQuery = true)
+    List<Object[]> findScoreDistributionRaw(
+            @Param("examId") Long examId,
+            @Param("classOfferingId") String classOfferingId
+    );
+
+
+    @Query(value = """
+        SELECT
+            CAST(v.violation_type AS TEXT) AS violation_type,
+            COUNT(*) AS violation_count,
+            COUNT(DISTINCT a.student_id) AS affected_students
+        FROM exam_violation_log v
+        JOIN exam_attempt a
+            ON a.attempt_id = v.attempt_id
+        JOIN exam_assignment ea
+            ON ea.exam_id = v.exam_id
+        JOIN class_enrollment_cache ce
+            ON ce.class_offering_id = ea.class_offering_id
+           AND ce.student_id = a.student_id
+           AND UPPER(ce.status) = 'ENROLLED'
+        WHERE v.exam_id = :examId
+          AND (:classOfferingId IS NULL OR ea.class_offering_id = :classOfferingId)
+        GROUP BY CAST(v.violation_type AS TEXT)
+        ORDER BY violation_count DESC
+        """, nativeQuery = true)
+    List<Object[]> findViolationSummaryRaw(
+            @Param("examId") Long examId,
+            @Param("classOfferingId") String classOfferingId
+    );
+
+    @Query(value = """
+    WITH submitted_attempts AS (
+        SELECT DISTINCT a.attempt_id
+        FROM exam_attempt a
+        JOIN exam_assignment ea
+            ON ea.exam_id = a.exam_id
+        JOIN class_enrollment_cache ce
+            ON ce.class_offering_id = ea.class_offering_id
+           AND ce.student_id = a.student_id
+           AND UPPER(ce.status) = 'ENROLLED'
+        WHERE a.exam_id = :examId
+          AND a.status IN ('SUBMITTED', 'AUTO_SUBMITTED')
+          AND (:classOfferingId IS NULL OR ea.class_offering_id = :classOfferingId)
+    ),
+    answer_stats AS (
+        SELECT
+            q.question_id,
+            COUNT(ans.answer_id) AS total_answered,
+            SUM(CASE WHEN ans.is_correct = TRUE THEN 1 ELSE 0 END) AS correct_count,
+            SUM(CASE WHEN ans.is_correct = FALSE THEN 1 ELSE 0 END) AS incorrect_count
+        FROM exam_question q
+        LEFT JOIN exam_answer ans
+            ON ans.question_id = q.question_id
+           AND ans.attempt_id IN (
+                SELECT attempt_id
+                FROM submitted_attempts
+           )
+        WHERE q.exam_id = :examId
+        GROUP BY q.question_id
+    )
+    SELECT
+        q.question_id,
+        q.question_order,
+        CAST(q.question_type AS TEXT) AS question_type,
+        q.question_text,
+        COALESCE(s.correct_count, 0) AS correct_count,
+        COALESCE(s.incorrect_count, 0) AS incorrect_count,
+        COALESCE(s.total_answered, 0) AS total_answered,
+        COALESCE(
+            COALESCE(s.correct_count, 0) * 100.0 / NULLIF(s.total_answered, 0),
+            0
+        ) AS correct_percentage,
+        CASE
+            WHEN COALESCE(
+                COALESCE(s.correct_count, 0) * 100.0 / NULLIF(s.total_answered, 0),
+                0
+            ) >= 80 THEN 'Easy'
+            WHEN COALESCE(
+                COALESCE(s.correct_count, 0) * 100.0 / NULLIF(s.total_answered, 0),
+                0
+            ) >= 40 THEN 'Moderate'
+            ELSE 'Difficult'
+        END AS difficulty
+    FROM exam_question q
+    LEFT JOIN answer_stats s
+        ON s.question_id = q.question_id
+    WHERE q.exam_id = :examId
+    ORDER BY q.question_order ASC
+    """, nativeQuery = true)
+    List<Object[]> findQuestionAnalysisRaw(
+            @Param("examId") Long examId,
+            @Param("classOfferingId") String classOfferingId
     );
 }

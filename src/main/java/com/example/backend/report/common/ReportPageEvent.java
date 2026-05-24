@@ -1,4 +1,4 @@
-package com.example.backend.report.student;
+package com.example.backend.report.common;
 
 import com.lowagie.text.*;
 import com.lowagie.text.pdf.*;
@@ -6,7 +6,7 @@ import com.lowagie.text.pdf.*;
 import java.awt.Color;
 import java.io.InputStream;
 
-public class StudentAnswerSheetPageEvent extends PdfPageEventHelper {
+public class ReportPageEvent extends PdfPageEventHelper {
 
     private final String collegeOffering;
     private final String generatedByText;
@@ -15,7 +15,7 @@ public class StudentAnswerSheetPageEvent extends PdfPageEventHelper {
     private BaseFont regularFont;
     private BaseFont boldFont;
 
-    public StudentAnswerSheetPageEvent(
+    public ReportPageEvent(
             String collegeOffering,
             String generatedByText
     ) {
@@ -119,8 +119,10 @@ public class StudentAnswerSheetPageEvent extends PdfPageEventHelper {
         canvas.saveState();
         canvas.setColorStroke(Color.GRAY);
         canvas.setLineWidth(1f);
-        canvas.moveTo(35f, 685f);
-        canvas.lineTo(page.getRight() - 35f, 685f);
+        float lineY = page.getTop() - 107f;
+
+        canvas.moveTo(35f, lineY);
+        canvas.lineTo(page.getRight() - 35f, lineY);
         canvas.stroke();
         canvas.restoreState();
     }

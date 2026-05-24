@@ -24,35 +24,37 @@ public interface FacultyRepository extends Repository<Exam, Long> {
     FacultyProfileDTO findFacultyProfile(@Param("employeeId") String employeeId);
 
     @Query("""
-        SELECT new com.example.backend.dto.faculty.FacultyClassDTO(
-            co.classOfferingId,
-            co.courseCode,
-            co.courseDescription,
-            co.programCode,
-            co.sectionName,
-            co.yearLevel,
-            co.academicYear,
-            co.term,
-            COUNT(enrollment.studentId)
-        )
+    SELECT new com.example.backend.dto.faculty.FacultyClassDTO(
+        co.classOfferingId,
+        co.courseCode,
+        co.courseDescription,
+        co.programCode,
+        co.sectionName,
+        co.yearLevel,
+        co.academicYear,
+        co.term,
+        COUNT(DISTINCT enrollment.studentId)
+    )
+    FROM ClassOfferingCache co
+    LEFT JOIN ClassEnrollmentCache enrollment
+        ON enrollment.classOfferingId = co.classOfferingId
+       AND enrollment.status = 'ENROLLED'
+    WHERE co.classOfferingId IN (
+        SELECT DISTINCT fl.classOfferingId
         FROM FacultyLoadCache fl
-        JOIN ClassOfferingCache co
-            ON co.classOfferingId = fl.classOfferingId
-        LEFT JOIN ClassEnrollmentCache enrollment
-            ON enrollment.classOfferingId = co.classOfferingId
-           AND enrollment.status = 'ENROLLED'
         WHERE fl.employeeId = :employeeId
-        GROUP BY
-            co.classOfferingId,
-            co.courseCode,
-            co.courseDescription,
-            co.programCode,
-            co.sectionName,
-            co.yearLevel,
-            co.academicYear,
-            co.term
-        ORDER BY co.courseCode, co.sectionName
-    """)
+    )
+    GROUP BY
+        co.classOfferingId,
+        co.courseCode,
+        co.courseDescription,
+        co.programCode,
+        co.sectionName,
+        co.yearLevel,
+        co.academicYear,
+        co.term
+    ORDER BY co.courseCode, co.sectionName
+""")
     List<FacultyClassDTO> findAssignedClasses(@Param("employeeId") String employeeId);
 
     @Query("""

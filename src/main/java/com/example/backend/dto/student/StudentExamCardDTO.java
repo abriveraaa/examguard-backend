@@ -1,5 +1,7 @@
 package com.example.backend.dto.student;
 
+import com.example.backend.entity.enums.ExamMode;
+import com.example.backend.entity.exam.Exam;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -17,7 +19,7 @@ public class StudentExamCardDTO {
     private String term;
     private String academicYear;
     private String classOfferingStatus;
-    private String mode;
+    private ExamMode mode;
     private String faculty;
     private Long questionCount;
     private Integer durationMinutes;
@@ -37,7 +39,7 @@ public class StudentExamCardDTO {
             String term,
             String academicYear,
             String classOfferingStatus,
-            String mode,
+            ExamMode mode,
             String faculty,
             Long questionCount,
             Integer durationMinutes,

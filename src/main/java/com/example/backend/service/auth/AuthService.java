@@ -15,6 +15,8 @@ import com.example.backend.utility.TimeUtil;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.security.SecureRandom;
+import java.util.Base64;
 import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
@@ -579,6 +581,7 @@ public class AuthService {
         sessionLog.setLoginStatus("ACTIVE");
         sessionLog.setMessage(message);
         sessionLog.setLoginAt(TimeUtil.now());
+        sessionLog.setExpiresAt(TimeUtil.now().plusHours(8));
         sessionLog.setIpAddress(ipAddress);
 
         userSessionLogRepository.save(sessionLog);
@@ -609,9 +612,20 @@ public class AuthService {
             return null;
         }
 
+        if (session.getLogoutAt() != null) {
+            return null;
+        }
+
+        if (session.getExpiresAt() == null || TimeUtil.now().isAfter(session.getExpiresAt())) {
+            session.setLoginStatus("EXPIRED");
+            session.setMessage("Session expired.");
+            userSessionLogRepository.save(session);
+            return null;
+        }
+
         UserAccess user = session.getUserAccess();
 
-        if (user == null) {
+        if (user == null || !user.isActive() || user.isBlocked()) {
             return null;
         }
 
@@ -669,7 +683,13 @@ public class AuthService {
     }
 
     private String generateSessionToken() {
-        return UUID.randomUUID().toString();
+        SecureRandom random = new SecureRandom();
+        byte[] bytes = new byte[32];
+        random.nextBytes(bytes);
+
+        return Base64.getUrlEncoder()
+                .withoutPadding()
+                .encodeToString(bytes);
     }
 
     private String resolveUserEmail(UserAccess user) {

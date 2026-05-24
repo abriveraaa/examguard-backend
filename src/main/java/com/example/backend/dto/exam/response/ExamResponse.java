@@ -32,6 +32,8 @@ public class ExamResponse {
     private Boolean shuffleChoices;
     private OffsetDateTime rawStartDateTime;
     private OffsetDateTime rawEndDateTime;
+    private String term;
+    private String academicYear;
     private List<String> classOfferingIds = new ArrayList<>();
     private List<QuestionPreview> questions = new ArrayList<>();
 
@@ -48,6 +50,8 @@ public class ExamResponse {
             String status,
             String duration,
             String assigned,
+            String term,
+            String academicYear,
             String takers,
             String startDateTime,
             String endDateTime,
@@ -63,6 +67,8 @@ public class ExamResponse {
         this.status = status;
         this.duration = duration;
         this.assigned = assigned;
+        this.term = term;
+        this.academicYear = academicYear;
         this.takers = takers;
         this.startDateTime = startDateTime;
         this.endDateTime = endDateTime;
@@ -81,6 +87,8 @@ public class ExamResponse {
             String status,
             String duration,
             String assigned,
+            String term,
+            String academicYear,
             String takers,
             String startDateTime,
             String endDateTime,
@@ -98,6 +106,8 @@ public class ExamResponse {
                 status,
                 duration,
                 assigned,
+                term,
+                academicYear,
                 takers,
                 startDateTime,
                 endDateTime,
@@ -151,10 +161,15 @@ public class ExamResponse {
             this.points = points;
             this.questionOrder = questionOrder;
             this.correctAnswer = correctAnswer;
-            this.choices = choices == null ? new ArrayList<>() : choices;
-        }
+            this.questionInstruction = questionInstruction;
+            this.rubrics = rubrics;
 
+            if (choices != null) {
+                this.choices.addAll(choices);
+            }
+        }
     }
+
 
     @Getter
     @Setter

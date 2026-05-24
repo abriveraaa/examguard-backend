@@ -1,5 +1,6 @@
 package com.example.backend.repository.exam;
 
+import com.example.backend.dto.exam.response.ExamListProjection;
 import com.example.backend.dto.student.StudentResultHeaderDTO;
 import com.example.backend.dto.student.dashboard.StudentResultSummaryDTO;
 import com.example.backend.dto.student.dashboard.StudentUpcomingExamDTO;
@@ -65,17 +66,13 @@ public interface ExamRepository extends JpaRepository<Exam, Long> {
     @Query(value = """
     SELECT DISTINCT e.*
     FROM exam e
-    JOIN exam_assignment ea ON ea.exam_id = e.exam_id
-    JOIN faculty_load_cache fl ON fl.class_offering_id = ea.class_offering_id
-    JOIN user_access ue ON ue.school_id = fl.employee_id
-    WHERE ue.username = :employeeId
-
-    UNION
-
-    SELECT DISTINCT e.*
-    FROM exam e
-    WHERE e.created_by = :employeeId
-    ORDER BY created_at DESC
+    LEFT JOIN exam_assignment ea 
+        ON ea.exam_id = e.exam_id
+    LEFT JOIN faculty_load_cache fl 
+        ON fl.class_offering_id = ea.class_offering_id
+    WHERE fl.employee_id = :employeeId
+       OR e.created_by = :employeeId
+    ORDER BY e.created_at DESC
     """, nativeQuery = true)
     List<Exam> findVisibleExamsForFaculty(@Param("employeeId") String employeeId);
 

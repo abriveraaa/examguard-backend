@@ -7,8 +7,10 @@ import com.example.backend.dto.exam.request.SubmitExamRequest;
 import com.example.backend.dto.student.StudentExamCardDTO;
 import com.example.backend.dto.student.dashboard.StudentResponse;
 import com.example.backend.dto.student.result.StudentExamResultResponse;
+import com.example.backend.entity.core.UserAccess;
 import com.example.backend.entity.exam.Exam;
 import com.example.backend.repository.exam.ExamRepository;
+import com.example.backend.service.auth.AuthService;
 import com.example.backend.service.report.StudentAnswerSheetReportService;
 import com.example.backend.service.student.StudentExamService;
 import com.example.backend.service.student.StudentService;
@@ -31,24 +33,28 @@ public class StudentController {
     private final StudentExamService studentExamService;
     private final StudentAnswerSheetReportService studentAnswerSheetReportService;
     private final ExamRepository examRepository;
+    private final AuthService authService;
 
     @GetMapping("/dashboard")
     public ResponseEntity<StudentResponse> getDashboard(
-            @RequestHeader("X-User-Id") String userId,
-            @RequestHeader("X-Role") String role
+            @RequestHeader("Authorization") String authorization
     ) {
+        UserAccess user = authService.getUserFromSession(authorization);
+
         return ResponseEntity.ok(
-                studentService.getDashboard(userId, role)
+                studentService.getDashboard(user.getSchoolId(), user.getRole())
         );
     }
 
     @PostMapping("/dashboard/results/{examId}/view")
     public ResponseEntity<Void> markResultViewed(
             @PathVariable Long examId,
-            @RequestHeader("X-User-Id") String studentId
+            @RequestHeader("Authorization") String authorization
     ) {
+        UserAccess user = authService.getUserFromSession(authorization);
+
         studentService.markDashboardItemViewed(
-                studentId,
+                user.getSchoolId(),
                 "RESULT",
                 examId
         );
@@ -59,10 +65,12 @@ public class StudentController {
     @PostMapping("/dashboard/violations/{examId}/view")
     public ResponseEntity<Void> markViolationViewed(
             @PathVariable Long examId,
-            @RequestHeader("X-User-Id") String studentId
+            @RequestHeader("Authorization") String authorization
     ) {
+        UserAccess user = authService.getUserFromSession(authorization);
+
         studentService.markDashboardItemViewed(
-                studentId,
+                user.getSchoolId(),
                 "VIOLATION",
                 examId
         );
@@ -73,46 +81,51 @@ public class StudentController {
     @PostMapping("/exams/answers/save")
     public ResponseEntity<ExamResult> saveAnswer(
             @RequestBody SaveAnswerRequest request,
-            @RequestHeader("X-User-Id") String studentId
+            @RequestHeader("Authorization") String authorization
     ) {
+        UserAccess user = authService.getUserFromSession(authorization);
 
         return ResponseEntity.ok(
                 examTakingService.saveAnswer(
                         request,
-                        studentId
+                        user.getSchoolId()
                 )
         );
     }
 
     @GetMapping("/exams")
     public List<StudentExamCardDTO> getStudentExams(
-            @RequestHeader("X-User-Id") String studentId,
-            @RequestHeader("X-Role") String role
+            @RequestHeader("Authorization") String authorization
     ) {
-        if (!"STUDENT".equalsIgnoreCase(role)) {
+        UserAccess user = authService.getUserFromSession(authorization);
+
+        if (!"STUDENT".equalsIgnoreCase(user.getRole())) {
             throw new RuntimeException("Only students can access student exams.");
         }
 
-        return studentExamService.getStudentExamCards(studentId);
+        return studentExamService.getStudentExamCards(user.getSchoolId());
     }
 
     @GetMapping("/exams/{examId}/results")
     public ResponseEntity<StudentExamResultResponse> getStudentExamResult(
             @PathVariable Long examId,
-            @RequestHeader("X-User-Id") String studentId
+            @RequestHeader("Authorization") String authorization
     ) {
+        UserAccess user = authService.getUserFromSession(authorization);
+
         return ResponseEntity.ok(
-                studentService.getStudentExamResult(examId, studentId)
+                studentService.getStudentExamResult(examId, user.getSchoolId())
         );
     }
 
     @GetMapping("/exams/{examId}/answer-sheet-report")
     public ResponseEntity<byte[]> downloadAnswerSheetReport(
             @PathVariable Long examId,
-            @RequestHeader("X-User-Id") String studentId
+            @RequestHeader("Authorization") String authorization
     ) {
+        UserAccess user = authService.getUserFromSession(authorization);
 
-        byte[] pdf = studentAnswerSheetReportService.generate(examId, studentId);
+        byte[] pdf = studentAnswerSheetReportService.generate(examId, user.getSchoolId());
 
         Exam exam = examRepository.findById(examId)
                 .orElseThrow(() -> new RuntimeException("Exam not found."));
@@ -123,7 +136,7 @@ public class StudentController {
                 .replace(" ", "_");
 
         String filename =
-                studentId + "-" + sanitizedExamTitle + ".pdf";
+                user.getSchoolId() + "-" + sanitizedExamTitle + ".pdf";
 
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_PDF)
@@ -137,19 +150,22 @@ public class StudentController {
     @PostMapping("/exams/activity")
     public ExamResult logExamActivity(
             @RequestBody ExamActivityRequest request,
-            @RequestHeader("X-User-Id") String studentId,
-            @RequestHeader("X-Role") String role
+            @RequestHeader("Authorization") String authorization
     ) {
-        return examTakingService.logExamActivity(request, studentId, role);
+        UserAccess user = authService.getUserFromSession(authorization);
+
+        return examTakingService.logExamActivity(request, user.getSchoolId(), user.getRole());
     }
 
     @PostMapping("/exams/submit")
     public ResponseEntity<ExamResult> submitExam(
             @RequestBody SubmitExamRequest request,
-            @RequestHeader("X-User-Id") String studentId
+            @RequestHeader("Authorization") String authorization
     ) {
+        UserAccess user = authService.getUserFromSession(authorization);
+
         return ResponseEntity.ok(
-                examTakingService.submitExam(request.getAttemptId(), studentId)
+                examTakingService.submitExam(request.getAttemptId(), user.getSchoolId())
         );
     }
 }

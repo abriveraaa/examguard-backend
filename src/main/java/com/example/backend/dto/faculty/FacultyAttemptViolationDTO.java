@@ -1,5 +1,6 @@
 package com.example.backend.dto.faculty;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -15,9 +16,9 @@ public class FacultyAttemptViolationDTO {
     private String severity;
     private String violationMessage;
     private String evidenceUrl;
+    private JsonNode evidenceMetadata;
     private Integer attemptNumber;
     private OffsetDateTime occurredAt;
-
     private String reviewStatus;
     private String reviewedBy;
     private OffsetDateTime reviewedAt;
@@ -29,6 +30,7 @@ public class FacultyAttemptViolationDTO {
             String severity,
             String violationMessage,
             String evidenceUrl,
+            JsonNode evidenceMetadata,
             Integer attemptNumber,
             OffsetDateTime occurredAt,
             String reviewStatus,
@@ -41,9 +43,9 @@ public class FacultyAttemptViolationDTO {
         this.severity = severity;
         this.violationMessage = violationMessage;
         this.evidenceUrl = evidenceUrl;
+        this.evidenceMetadata = evidenceMetadata;
         this.attemptNumber = attemptNumber;
         this.occurredAt = occurredAt;
-
         this.reviewStatus = reviewStatus;
         this.reviewedBy = reviewedBy;
         this.reviewedAt = reviewedAt;

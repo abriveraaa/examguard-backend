@@ -25,7 +25,6 @@ public class SessionContextFilter implements Filter {
             String role = httpRequest.getHeader("X-Role");
 
             SessionContext.set(userId, role);
-
             chain.doFilter(request, response);
 
         } finally {

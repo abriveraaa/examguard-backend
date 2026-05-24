@@ -13,7 +13,7 @@ import java.util.List;
 public interface StudentExamRepository extends JpaRepository<Exam, Long> {
 
     @Query("""
-    SELECT DISTINCT new com.example.backend.dto.student.StudentExamCardDTO(
+    SELECT new com.example.backend.dto.student.StudentExamCardDTO(
         e.examId,
         e.title,
         co.courseCode,
@@ -21,7 +21,7 @@ public interface StudentExamRepository extends JpaRepository<Exam, Long> {
         co.term,
         co.academicYear,
         co.status AS classOfferingStatus,
-        CAST(e.examMode AS string),
+        e.examMode,
 
         CASE
             WHEN fp.employeeId IS NOT NULL
@@ -72,10 +72,17 @@ public interface StudentExamRepository extends JpaRepository<Exam, Long> {
             e.timeLimitMinutes,
             e.startDateTime,
             e.endDateTime,
+            e.updatedAt,
             a.status,
             a.reviewStatus,
             e.resultsReleased
-    ORDER BY e.startDateTime ASC
+    ORDER BY
+        CASE
+            WHEN a.status = com.example.backend.entity.enums.ExamAttemptStatus.IN_PROGRESS THEN 0
+            WHEN e.startDateTime > CURRENT_TIMESTAMP THEN 1
+            ELSE 2
+        END,
+        e.updatedAt DESC
 """)
     List<StudentExamCardDTO> findStudentExamCards(
             @Param("studentId") String studentId

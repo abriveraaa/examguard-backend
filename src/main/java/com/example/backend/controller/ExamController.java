@@ -10,6 +10,7 @@ import com.example.backend.dto.exam.result.ExamResult;
 import com.example.backend.dto.faculty.*;
 import com.example.backend.dto.faculty.request.FacultyUpdateAnswerScoreRequest;
 import com.example.backend.dto.faculty.request.ViolationDecisionRequest;
+import com.example.backend.dto.faculty.response.AnswerReviewTimelineDTO;
 import com.example.backend.dto.faculty.response.FacultyAttemptReviewResponse;
 import com.example.backend.dto.faculty.response.FacultyExamDetailResponse;
 import com.example.backend.dto.faculty.response.SimpleMessageResponse;
@@ -23,6 +24,7 @@ import com.example.backend.repository.cache.FacultyProfileCacheRepository;
 import com.example.backend.repository.cache.StudentProfileCacheRepository;
 import com.example.backend.repository.core.AdminProfileRepository;
 import com.example.backend.repository.core.UserAccessRepository;
+import com.example.backend.service.auth.AuthService;
 import com.example.backend.service.core.SystemActivityLogService;
 import com.example.backend.service.exam.ExamAssignmentService;
 import com.example.backend.service.exam.ExamService;
@@ -60,7 +62,7 @@ public class ExamController {
     private final AdminProfileRepository adminProfileRepository;
     private final FacultyProfileCacheRepository facultyProfileCacheRepository;
     private final StudentProfileCacheRepository studentProfileCacheRepository;
-    private final UserAccessRepository userAccessRepository;
+    private final AuthService authService;
 
 
     public ExamController(ExamService examService,
@@ -72,7 +74,7 @@ public class ExamController {
                           AdminProfileRepository adminProfileRepository,
                           FacultyProfileCacheRepository facultyProfileCacheRepository,
                           StudentProfileCacheRepository studentProfileCacheRepository,
-                          UserAccessRepository userAccessRepository) {
+                          AuthService authService) {
         this.examService = examService;
         this.examAssignmentService = examAssignmentService;
         this.examWorkspaceService = examWorkspaceService;
@@ -82,7 +84,7 @@ public class ExamController {
         this.adminProfileRepository = adminProfileRepository;
         this.facultyProfileCacheRepository = facultyProfileCacheRepository;
         this.studentProfileCacheRepository = studentProfileCacheRepository;
-        this.userAccessRepository = userAccessRepository;
+        this.authService = authService;
     }
 
     // =========================
@@ -200,10 +202,18 @@ public class ExamController {
     public ResponseEntity<ExamResult> updateExam(
             @PathVariable Long examId,
             @RequestBody ExamRequest request,
-            @RequestHeader("X-User-Id") String schoolId,
-            @RequestHeader("X-Role") String role
+            @RequestHeader("Authorization") String authorization
     ) {
-        ExamResult result = examService.updateExam(examId, request, schoolId, role);
+        UserAccess user = authService.getUserFromSession(authorization);
+
+        if (user == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED,
+                    "Invalid or expired session."
+            );
+        }
+
+        ExamResult result = examService.updateExam(examId, request, user.getSchoolId(), user.getRole());
 
         if (!result.isSuccess()) {
             return ResponseEntity.badRequest().body(result);
@@ -215,11 +225,23 @@ public class ExamController {
     @GetMapping("/{examId}")
     public ResponseEntity<ExamResponse> viewExam(
             @PathVariable Long examId,
-            @RequestHeader("X-User-Id") String schoolId,
-            @RequestHeader("X-Role") String role
+            @RequestHeader("Authorization") String authorization
     ) {
+        UserAccess user = authService.getUserFromSession(authorization);
+
+        if (user == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED,
+                    "Invalid or expired session."
+            );
+        }
+
         return ResponseEntity.ok(
-                examService.viewExam(examId, schoolId, role)
+                examService.viewExam(
+                        examId,
+                        user.getSchoolId(),
+                        user.getRole()
+                )
         );
     }
 
@@ -316,6 +338,17 @@ public class ExamController {
         );
     }
 
+    @GetMapping("/review/answers/{answerId}/timeline")
+    public ResponseEntity<List<AnswerReviewTimelineDTO>> getAnswerReviewTimeline(
+            @PathVariable Long answerId,
+            @RequestHeader("X-User-Id") String employeeId,
+            @RequestHeader("X-Role") String role
+    ) {
+        return ResponseEntity.ok(
+                examWorkspaceService.getAnswerReviewTimeline(answerId, employeeId, role)
+        );
+    }
+
     @GetMapping("/{examId}/leaderboard")
     public ResponseEntity<List<FacultyLeaderboardDTO>> getExamLeaderboard(
             @PathVariable Long examId,
@@ -401,10 +434,18 @@ public class ExamController {
     // =========================
     @GetMapping
     public ResponseEntity<List<ExamResponse>> getAllExams(
-            @RequestHeader("X-User-Id") String schoolId,
-            @RequestHeader("X-Role") String role
+            @RequestHeader("Authorization") String authorization
     ) {
-        return ResponseEntity.ok(examService.getAllExams(role, schoolId));
+        UserAccess user = authService.getUserFromSession(authorization);
+
+        if (user == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED,
+                    "Invalid or expired session."
+            );
+        }
+
+        return ResponseEntity.ok(examService.getAllExams(user.getRole(), user.getSchoolId()));
     }
 
     // =========================
@@ -516,6 +557,7 @@ public class ExamController {
         ReportExportResult result = reportExportService.generateExamPortfolioPdf(
                 examId,
                 exportMode,
+                classOfferingId,
                 buildGeneratedByText(userId, role)
         );
 

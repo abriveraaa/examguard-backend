@@ -13,7 +13,6 @@ public class FacultyDashboardResponse {
 
     private FacultyProfileDTO profile;
     private FacultyDashboardStatsDTO stats;
-
     private List<FacultyExamSummaryDTO> activeExams;
     private List<FacultyViolationReviewDTO> needsReview;
     private List<FacultySubmissionSummaryDTO> recentSubmissions;

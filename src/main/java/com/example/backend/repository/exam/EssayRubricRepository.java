@@ -12,5 +12,6 @@ public interface EssayRubricRepository extends JpaRepository<EssayRubric, Long> 
 
     List<EssayRubric> findByQuestionQuestionIdInOrderByQuestionQuestionIdAscDisplayOrderAsc(List<Long> questionIds);
     List<EssayRubric> findByQuestionQuestionIdOrderByDisplayOrderAsc(Long questionId);
+    
     void deleteByQuestionExamExamId(Long examId);
 }

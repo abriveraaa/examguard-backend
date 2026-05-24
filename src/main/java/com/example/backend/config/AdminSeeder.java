@@ -32,17 +32,6 @@ public class AdminSeeder implements CommandLineRunner {
         String originalId = "2024-ADMIN-001";
         String username = "2024ADMIN001";
 
-        if (adminProfileRepository.findByEmployeeId(originalId).isEmpty()) {
-            AdminProfile admin = new AdminProfile();
-            admin.setEmployeeId(originalId);
-            admin.setFirstName("System");
-            admin.setLastName("Administrator");
-            admin.setEmail("examguard.system@gmail.com");
-            admin.setBirthDate(LocalDate.of(1997,5,23));
-            admin.setIsActive(true);
-            adminProfileRepository.save(admin);
-        }
-
         if (userAccessRepository.findByUsername(username).isEmpty()) {
             UserAccess access = new UserAccess();
             access.setSchoolId(originalId);
@@ -55,6 +44,17 @@ public class AdminSeeder implements CommandLineRunner {
             access.setMustChangePassword(false);
             access.setFailedLoginAttempts(0);
             userAccessRepository.save(access);
+        }
+
+        if (adminProfileRepository.findByEmployeeId(originalId).isEmpty()) {
+            AdminProfile admin = new AdminProfile();
+            admin.setEmployeeId(originalId);
+            admin.setFirstName("System");
+            admin.setLastName("Administrator");
+            admin.setEmail("examguard.system@gmail.com");
+            admin.setBirthDate(LocalDate.of(1997,5,23));
+            admin.setIsActive(true);
+            adminProfileRepository.save(admin);
         }
     }
 }

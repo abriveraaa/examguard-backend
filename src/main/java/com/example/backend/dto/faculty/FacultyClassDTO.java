@@ -38,6 +38,4 @@ public class FacultyClassDTO {
         this.term = term;
         this.enrolledCount = enrolledCount;
     }
-
-    // getters and setters
 }

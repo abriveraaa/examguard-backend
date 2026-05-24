@@ -6,6 +6,8 @@ import com.example.backend.report.exam.dto.*;
 import com.example.backend.report.exam.renderer.StudentAnswerPdfRenderer;
 import com.example.backend.report.model.ReportRequest;
 import com.example.backend.repository.report.ReportRepository;
+import com.example.backend.entity.exam.ExamAnswerReviewLog;
+import com.example.backend.repository.exam.ExamAnswerReviewLogRepository;
 import com.lowagie.text.*;
 import com.lowagie.text.pdf.*;
 
@@ -26,12 +28,15 @@ public class ExamPortfolioPdfExporter extends AbstractPdfReportExporter {
 
     private final ReportRepository reportRepository;
     private final StudentAnswerPdfRenderer studentAnswerPdfRenderer;
+    private final ExamAnswerReviewLogRepository examAnswerReviewLogRepository;
     private final Font unicodeFont;
 
     public ExamPortfolioPdfExporter(ReportRepository reportRepository,
-                                    StudentAnswerPdfRenderer studentAnswerPdfRenderer) {
+                                    StudentAnswerPdfRenderer studentAnswerPdfRenderer,
+                                    ExamAnswerReviewLogRepository examAnswerReviewLogRepository) {
         this.reportRepository = reportRepository;
         this.studentAnswerPdfRenderer = studentAnswerPdfRenderer;
+        this.examAnswerReviewLogRepository = examAnswerReviewLogRepository;
 
         try {
             BaseFont unicodeBaseFont = BaseFont.createFont(
@@ -788,7 +793,7 @@ public class ExamPortfolioPdfExporter extends AbstractPdfReportExporter {
             Long examId,
             String classOfferingId,
             ReportExamHeaderDTO header
-    )throws DocumentException {
+    ) throws DocumentException {
 
         List<ReportStudentSummaryDTO> students =
                 reportRepository.findStudentSummariesForReport(
@@ -825,6 +830,23 @@ public class ExamPortfolioPdfExporter extends AbstractPdfReportExporter {
                 answers.stream()
                         .collect(Collectors.groupingBy(ReportStudentAnswerDTO::studentId));
 
+        List<Long> answerIds =
+                answers.stream()
+                        .map(ReportStudentAnswerDTO::answerId)
+                        .filter(Objects::nonNull)
+                        .distinct()
+                        .toList();
+
+        Map<Long, List<ExamAnswerReviewLog>> feedbackLogsByAnswerId =
+                answerIds.isEmpty()
+                        ? Map.of()
+                        : examAnswerReviewLogRepository
+                        .findFeedbackLogsByAnswerIds(answerIds)
+                        .stream()
+                        .collect(Collectors.groupingBy(
+                                log -> log.getAnswer().getAnswerId()
+                        ));
+
         for (ReportStudentSummaryDTO student : students) {
             if ("DID_NOT_TAKE".equalsIgnoreCase(student.attemptStatus())) {
                 continue;
@@ -832,12 +854,7 @@ public class ExamPortfolioPdfExporter extends AbstractPdfReportExporter {
 
             document.newPage();
 
-            List<ReportStudentAnswerDTO> studentAnswers =
-                    answersByStudentId.getOrDefault(
-                            student.studentId(),
-                            List.of()
-                    );
-
+            List<ReportStudentAnswerDTO> studentAnswers = answersByStudentId.getOrDefault(student.studentId(), List.of());
 
             studentAnswerPdfRenderer.renderStudentAnswer(
                     document,
@@ -845,7 +862,8 @@ public class ExamPortfolioPdfExporter extends AbstractPdfReportExporter {
                     student,
                     studentAnswers,
                     choicesByQuestionId,
-                    rubricScoresByAttemptAndQuestion
+                    rubricScoresByAttemptAndQuestion,
+                    feedbackLogsByAnswerId
             );
         }
     }

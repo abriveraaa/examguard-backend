@@ -1,6 +1,7 @@
 package com.example.backend.report.exam.renderer;
 
 import com.example.backend.entity.enums.QuestionType;
+import com.example.backend.entity.exam.ExamAnswerReviewLog;
 import com.example.backend.report.exam.dto.*;
 import com.lowagie.text.*;
 import com.lowagie.text.pdf.*;
@@ -38,7 +39,8 @@ public class StudentAnswerPdfRenderer {
             ReportStudentSummaryDTO student,
             List<ReportStudentAnswerDTO> studentAnswers,
             Map<Long, List<ReportChoiceDTO>> choicesByQuestionId,
-            Map<String, List<ReportEssayRubricScoreDTO>> rubricScoresByAttemptAndQuestion
+            Map<String, List<ReportEssayRubricScoreDTO>> rubricScoresByAttemptAndQuestion,
+            Map<Long, List<ExamAnswerReviewLog>> feedbackLogsByAnswerId
     ) throws DocumentException {
 
         addCourseAndExamTitle(document, header);
@@ -53,10 +55,10 @@ public class StudentAnswerPdfRenderer {
                 student.faculty()
         );
 
-        addStudentAnswerGroup(document, "I. MULTIPLE CHOICE", QuestionType.MULTIPLE_CHOICE, studentAnswers, choicesByQuestionId, rubricScoresByAttemptAndQuestion);
-        addStudentAnswerGroup(document, "II. TRUE OR FALSE", QuestionType.TRUE_FALSE, studentAnswers, choicesByQuestionId, rubricScoresByAttemptAndQuestion);
-        addStudentAnswerGroup(document, "III. IDENTIFICATION", QuestionType.IDENTIFICATION, studentAnswers, choicesByQuestionId, rubricScoresByAttemptAndQuestion);
-        addStudentAnswerGroup(document, "IV. ESSAY", QuestionType.ESSAY, studentAnswers, choicesByQuestionId, rubricScoresByAttemptAndQuestion);
+        addStudentAnswerGroup(document, "I. MULTIPLE CHOICE", QuestionType.MULTIPLE_CHOICE, studentAnswers, choicesByQuestionId, rubricScoresByAttemptAndQuestion, feedbackLogsByAnswerId);
+        addStudentAnswerGroup(document, "II. TRUE OR FALSE", QuestionType.TRUE_FALSE, studentAnswers, choicesByQuestionId, rubricScoresByAttemptAndQuestion, feedbackLogsByAnswerId);
+        addStudentAnswerGroup(document, "III. IDENTIFICATION", QuestionType.IDENTIFICATION, studentAnswers, choicesByQuestionId, rubricScoresByAttemptAndQuestion, feedbackLogsByAnswerId);
+        addStudentAnswerGroup(document, "IV. ESSAY", QuestionType.ESSAY, studentAnswers, choicesByQuestionId, rubricScoresByAttemptAndQuestion, feedbackLogsByAnswerId);
     }
 
     private void addCourseAndExamTitle(Document document, ReportExamHeaderDTO header) throws DocumentException {
@@ -121,7 +123,8 @@ public class StudentAnswerPdfRenderer {
             QuestionType questionType,
             List<ReportStudentAnswerDTO> answers,
             Map<Long, List<ReportChoiceDTO>> choicesByQuestionId,
-            Map<String, List<ReportEssayRubricScoreDTO>> rubricScoresByAttemptAndQuestion
+            Map<String, List<ReportEssayRubricScoreDTO>> rubricScoresByAttemptAndQuestion,
+            Map<Long, List<ExamAnswerReviewLog>> feedbackLogsByAnswerId
     ) throws DocumentException {
 
         List<ReportStudentAnswerDTO> filtered =
@@ -151,7 +154,93 @@ public class StudentAnswerPdfRenderer {
                             List.of()
                     )
             );
+
+            addQuestionFeedback(
+                    document,
+                    answer,
+                    feedbackLogsByAnswerId.getOrDefault(
+                            answer.answerId(),
+                            List.of()
+                    )
+            );
+
         }
+    }
+
+    private void addQuestionFeedback(
+            Document document,
+            ReportStudentAnswerDTO answer,
+            List<ExamAnswerReviewLog> logs
+    ) throws DocumentException {
+
+        boolean hasFacultyFeedback =
+                answer.facultyFeedback() != null &&
+                        !answer.facultyFeedback().isBlank();
+
+        List<ExamAnswerReviewLog> violationFeedbackLogs =
+                logs.stream()
+                        .filter(log ->
+                                log.getNotes() != null &&
+                                        !log.getNotes().isBlank()
+                        )
+                        .toList();
+
+        if (!hasFacultyFeedback && violationFeedbackLogs.isEmpty()) {
+            return;
+        }
+
+        Font titleFont =
+                FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8.5f);
+
+        Font bodyFont =
+                FontFactory.getFont(FontFactory.HELVETICA, 8f);
+
+        if (hasFacultyFeedback) {
+            Paragraph title = new Paragraph("Faculty Feedback", titleFont);
+            title.setIndentationLeft(18f);
+            title.setSpacingBefore(3f);
+            title.setSpacingAfter(1f);
+            document.add(title);
+
+            Paragraph feedback =
+                    new Paragraph(answer.facultyFeedback(), bodyFont);
+
+            feedback.setIndentationLeft(28f);
+            feedback.setSpacingAfter(3f);
+            document.add(feedback);
+        }
+
+        if (!violationFeedbackLogs.isEmpty()) {
+            Paragraph title = new Paragraph("Violation Feedback", titleFont);
+            title.setIndentationLeft(18f);
+            title.setSpacingBefore(3f);
+            title.setSpacingAfter(1f);
+            document.add(title);
+
+            for (ExamAnswerReviewLog log : violationFeedbackLogs) {
+                Paragraph item =
+                        new Paragraph(
+                                formatFeedbackTimestamp(log.getCreatedAt()) +
+                                        " - " +
+                                        log.getNotes(),
+                                bodyFont
+                        );
+
+                item.setIndentationLeft(28f);
+                item.setSpacingAfter(2f);
+                document.add(item);
+            }
+        }
+    }
+
+    private String formatFeedbackTimestamp(OffsetDateTime value) {
+        if (value == null) {
+            return "";
+        }
+
+        return value.format(
+                DateTimeFormatter.ofPattern("MMM dd, yyyy hh:mm a")
+        );
     }
 
     private void addStudentAnswerBlock(

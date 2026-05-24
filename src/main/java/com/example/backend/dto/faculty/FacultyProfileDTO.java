@@ -33,5 +33,4 @@ public class FacultyProfileDTO {
         return ((firstName == null ? "" : firstName) + " " + (lastName == null ? "" : lastName)).trim();
     }
 
-    // getters and setters
 }

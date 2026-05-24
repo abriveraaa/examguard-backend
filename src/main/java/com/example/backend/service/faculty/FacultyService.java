@@ -8,10 +8,14 @@ import com.example.backend.dto.faculty.response.FacultyAttemptReviewResponse;
 import com.example.backend.dto.faculty.response.FacultyDashboardResponse;
 import com.example.backend.dto.faculty.response.FacultyExamDetailResponse;
 import com.example.backend.dto.faculty.response.SimpleMessageResponse;
+import com.example.backend.entity.enums.ExamDisplayStatus;
+import com.example.backend.entity.enums.ExamStatus;
 import com.example.backend.entity.exam.*;
+import com.example.backend.repository.cache.ClassEnrollmentCacheRepository;
 import com.example.backend.repository.exam.*;
 import com.example.backend.repository.FacultyRepository;
 import com.example.backend.service.core.SystemActivityLogService;
+import com.example.backend.service.exam.ExamStatusService;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
@@ -25,34 +29,20 @@ import java.util.stream.Collectors;
 public class FacultyService {
 
     private final FacultyRepository facultyRepository;
-    private final ExamRepository examRepository;
-    private final ExamQuestionRepository examQuestionRepository;
-    private final ExamAnswerRepository examAnswerRepository;
-    private final ExamAttemptRepository examAttemptRepository;
-    private final EssayRubricRepository essayRubricRepository;
-    private final EssayRubricScoreRepository rubricScoreRepository;
-    private final SystemActivityLogService activityLogService;
     private final ExamWorkspaceRepository examWorkspaceRepository;
+    private final ExamStatusService examStatusService;
+    private final ClassEnrollmentCacheRepository classEnrollmentCacheRepository;
 
     public FacultyService(
             FacultyRepository facultyRepository,
-            ExamRepository examRepository,
-            ExamQuestionRepository examQuestionRepository,
-            ExamAnswerRepository examAnswerRepository,
-            ExamAttemptRepository examAttemptRepository,
-            EssayRubricRepository essayRubricRepository,
-            EssayRubricScoreRepository rubricScoreRepository,
-            SystemActivityLogService activityLogService, ExamWorkspaceRepository examWorkspaceRepository
+            ExamWorkspaceRepository examWorkspaceRepository,
+            ExamStatusService examStatusService,
+            ClassEnrollmentCacheRepository classEnrollmentCacheRepository
     ) {
         this.facultyRepository = facultyRepository;
-        this.examRepository = examRepository;
-        this.examQuestionRepository = examQuestionRepository;
-        this.examAnswerRepository = examAnswerRepository;
-        this.examAttemptRepository = examAttemptRepository;
-        this.essayRubricRepository = essayRubricRepository;
-        this.rubricScoreRepository = rubricScoreRepository;
-        this.activityLogService = activityLogService;
         this.examWorkspaceRepository = examWorkspaceRepository;
+        this.examStatusService = examStatusService;
+        this.classEnrollmentCacheRepository = classEnrollmentCacheRepository;
     }
 
     // =========================================================
@@ -70,28 +60,13 @@ public class FacultyService {
 
         validateRole(role);
 
-        FacultyDashboardResponse response =
-                new FacultyDashboardResponse();
+        FacultyDashboardResponse response = new FacultyDashboardResponse();
 
-        response.setProfile(
-                getDashboardProfile(employeeId, role)
-        );
-
-        response.setStats(
-                getDashboardStats(employeeId, role)
-        );
-
-        response.setActiveExams(
-                getDashboardActiveExams(employeeId, role)
-        );
-
-        response.setNeedsReview(
-                getDashboardNeedsReview(employeeId, role)
-        );
-
-        response.setRecentSubmissions(
-                getDashboardRecentSubmissions(employeeId, role)
-        );
+        response.setProfile(getDashboardProfile(employeeId, role));
+        response.setStats(getDashboardStats(employeeId, role));
+        response.setActiveExams(getDashboardActiveExams(employeeId, role));
+        response.setNeedsReview(getDashboardNeedsReview(employeeId, role));
+        response.setRecentSubmissions(getDashboardRecentSubmissions(employeeId, role));
 
         return response;
     }
@@ -144,10 +119,29 @@ public class FacultyService {
         }
 
         return exams.stream()
-                .filter(exam ->
-                        !"COMPLETED".equalsIgnoreCase(exam.getStatus()) &&
-                                !"CANCELLED".equalsIgnoreCase(exam.getStatus())
-                )
+                .peek(exam -> {
+                    Exam fakeExam = new Exam();
+
+                    fakeExam.setExamId(exam.getExamId());
+                    fakeExam.setStatus(ExamStatus.valueOf(exam.getStatus()));
+                    fakeExam.setStartDateTime(exam.getStartDateTime());
+                    fakeExam.setEndDateTime(exam.getEndDateTime());
+                    fakeExam.setExamMode(exam.getExamMode());
+
+                    ExamDisplayStatus computedStatus =
+                            examStatusService.getDisplayStatus(
+                                    fakeExam,
+                                    exam.getTotalAssigned() == null
+                                            ? 0
+                                            : exam.getTotalAssigned().intValue(),
+                                    exam.getSubmittedCount() == null
+                                            ? 0
+                                            : exam.getSubmittedCount().intValue()
+                            );
+
+                    exam.setStatus(computedStatus.name());
+                })
+                .filter(exam -> isDashboardActiveStatus(exam.getStatus()))
                 .toList();
     }
 
@@ -201,9 +195,8 @@ public class FacultyService {
         List<FacultyClassDTO> classes =
                 getFacultyClasses(employeeId, role);
 
-        long totalStudents = classes.stream()
-                .mapToLong(c -> c.getEnrolledCount() == null ? 0 : c.getEnrolledCount())
-                .sum();
+        long totalStudents =
+                classEnrollmentCacheRepository.countDistinctStudentsForFacultyDashboard(employeeId);
 
         long reviewQueueCount = getDashboardNeedsReview(employeeId, role)
                 .stream()
@@ -256,6 +249,26 @@ public class FacultyService {
     // =========================================================
     // HELPERS
     // =========================================================
+
+    private boolean isDashboardActiveStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return false;
+        }
+
+        return switch (status.toUpperCase()) {
+            case "DRAFT",
+                 "ASSIGNED",
+                 "PUBLISHED",
+                 "SCHEDULED",
+                 "ONGOING" -> true;
+
+            case "COMPLETED",
+                 "EXPIRED",
+                 "CANCELLED" -> false;
+
+            default -> false;
+        };
+    }
 
     private void validateRole(String role) {
 

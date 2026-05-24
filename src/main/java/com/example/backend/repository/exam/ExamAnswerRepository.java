@@ -16,6 +16,8 @@ public interface ExamAnswerRepository
 
     List<ExamAnswer> findByAttemptAttemptId(Long attemptId);
 
+    boolean existsByQuestionQuestionId(Long questionId);
+
     @Query("""
     SELECT COUNT(a) > 0
     FROM ExamAnswer a

@@ -4,6 +4,7 @@ import com.example.backend.entity.enums.QuestionType;
 
 public record ReportStudentAnswerDTO(
         Long attemptId,
+        Long answerId,
         String studentId,
         String studentName,
         Long questionId,

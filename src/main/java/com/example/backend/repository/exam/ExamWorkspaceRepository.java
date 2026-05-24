@@ -15,21 +15,17 @@ public interface ExamWorkspaceRepository extends JpaRepository<Exam, Long> {
     SELECT new com.example.backend.dto.faculty.FacultyExamSummaryDTO(
         e.examId,
         e.title,
-
+        
         MIN(co.courseCode),
         MIN(co.courseDescription),
-
         MIN(co.programCode),
         '',
         CAST(e.status AS string),
-
+        e.examMode,
         e.startDateTime,
         e.endDateTime,
-
         COUNT(DISTINCT enrollment.studentId),
-
         COUNT(DISTINCT attempt.attemptId),
-
         COUNT(DISTINCT v.attempt.studentId)
     )
 
@@ -541,6 +537,7 @@ GROUP BY
          violation.severity,
          violation.violationMessage,
          violation.evidenceUrl,
+         violation.evidenceMetadata,
          violation.attemptNumber,
          violation.occurredAt,
          violation.reviewStatus,

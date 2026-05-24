@@ -11,7 +11,6 @@ import com.example.backend.entity.cache.FacultyLoadCache;
 import com.example.backend.entity.cache.FacultyProfileCache;
 import com.example.backend.entity.cache.StudentProfileCache;
 import com.example.backend.entity.core.AdminProfile;
-import com.example.backend.entity.core.UserAccess;
 import com.example.backend.entity.enums.ExamAttemptStatus;
 import com.example.backend.entity.enums.ExamMode;
 import com.example.backend.entity.enums.QuestionType;
@@ -21,7 +20,6 @@ import com.example.backend.repository.exam.*;
 import com.example.backend.service.core.SystemActivityLogService;
 import com.example.backend.repository.cache.*;
 import com.example.backend.repository.core.AdminProfileRepository;
-import com.example.backend.repository.core.UserAccessRepository;
 import com.example.backend.entity.enums.ExamStatus;
 import com.example.backend.service.core.EmailService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -29,9 +27,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import net.coobird.thumbnailator.Thumbnails;
 import org.jspecify.annotations.NonNull;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.io.File;
 import java.math.RoundingMode;
@@ -51,6 +51,7 @@ import static com.example.backend.entity.enums.ExamStatus.*;
 @Service
 public class ExamService {
 
+    // Database Repositories
     private final ExamRepository examRepository;
     private final ExamQuestionRepository questionRepository;
     private final ExamChoiceRepository choiceRepository;
@@ -59,7 +60,6 @@ public class ExamService {
     private final QuestionViolationOverrideRepository questionViolationOverrideRepository;
     private final ExamStatusService examStatusService;
     private final ClassOfferingCacheRepository classOfferingCacheRepository;
-    private final UserAccessRepository userAccessRepository;
     private final AdminProfileRepository adminProfileRepository;
     private final StudentProfileCacheRepository studentProfileCacheRepository;
     private final FacultyProfileCacheRepository facultyProfileCacheRepository;
@@ -74,14 +74,19 @@ public class ExamService {
     private final EssayRubricRepository essayRubricRepository;
     private final EssayRubricScoreRepository rubricScoreRepository;
     private final SystemActivityLogService activityLogService;
+    private final ExamAnswerReviewLogRepository reviewLogRepository;
+    private final ClassEnrollmentCacheRepository classEnrollmentCacheRepository;
+
     private final Gson gson = new Gson();
 
-    private static final DateTimeFormatter DISPLAY_DATE =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    // Lobby Opened
+    private static final int LOBBY_OPEN_MINUTES_BEFORE_START = 15;
 
-    private static final DateTimeFormatter DISPLAY_DATE_TIME =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
-    private final ExamAssignmentService examAssignmentService;
+    // Time Converter
+    private static final DateTimeFormatter DISPLAY_DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    private static final DateTimeFormatter DISPLAY_DATE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private static final ZoneId MANILA_ZONE = ZoneId.of("Asia/Manila");
+
 
     public ExamService(ExamRepository examRepository,
                        ExamQuestionRepository questionRepository,
@@ -91,8 +96,8 @@ public class ExamService {
                        QuestionViolationOverrideRepository questionViolationOverrideRepository,
                        ClassOfferingCacheRepository classOfferingCacheRepository,
                        ExamStatusService examStatusService,
-                       UserAccessRepository userAccessRepository,
-                       AdminProfileRepository adminProfileRepository, StudentProfileCacheRepository studentProfileCacheRepository,
+                       AdminProfileRepository adminProfileRepository,
+                       StudentProfileCacheRepository studentProfileCacheRepository,
                        FacultyProfileCacheRepository facultyProfileCacheRepository,
                        FacultyLoadCacheRepository facultyLoadCacheRepository,
                        ExamTemplateService examTemplateService,
@@ -105,7 +110,8 @@ public class ExamService {
                        EssayRubricRepository essayRubricRepository,
                        EssayRubricScoreRepository rubricScoreRepository,
                        SystemActivityLogService activityLogService,
-                       ExamAssignmentService examAssignmentService) {
+                       ExamAnswerReviewLogRepository reviewLogRepository,
+                       ClassEnrollmentCacheRepository classEnrollmentCacheRepository) {
         this.examRepository = examRepository;
         this.questionRepository = questionRepository;
         this.choiceRepository = choiceRepository;
@@ -114,7 +120,6 @@ public class ExamService {
         this.questionViolationOverrideRepository = questionViolationOverrideRepository;
         this.classOfferingCacheRepository = classOfferingCacheRepository;
         this.examStatusService = examStatusService;
-        this.userAccessRepository = userAccessRepository;
         this.adminProfileRepository = adminProfileRepository;
         this.studentProfileCacheRepository = studentProfileCacheRepository;
         this.facultyProfileCacheRepository = facultyProfileCacheRepository;
@@ -129,9 +134,13 @@ public class ExamService {
         this.essayRubricRepository = essayRubricRepository;
         this.rubricScoreRepository = rubricScoreRepository;
         this.activityLogService = activityLogService;
-        this.examAssignmentService = examAssignmentService;
+        this.reviewLogRepository = reviewLogRepository;
+        this.classEnrollmentCacheRepository = classEnrollmentCacheRepository;
     }
 
+    // ====================
+    // DATABASE INTERACTION
+    // ====================
     @Transactional
     public ExamResult examDraft(ExamRequest request,
                                 String schoolId,
@@ -149,17 +158,9 @@ public class ExamService {
 
         Exam exam = examRepository.findById(examId).orElse(null);
 
-        if (exam == null) {
-            return new ExamResult(false, "Exam not found.", null, 0);
-        }
-
-        if (exam.getStatus() == CANCELLED) {
-            return new ExamResult(false, "Cancelled exam cannot be edited.", examId, 0);
-        }
-
-        if (exam.getStatus() == ExamStatus.COMPLETED) {
-            return new ExamResult(false, "Completed exam cannot be edited.", examId, 0);
-        }
+        if (exam == null) { return new ExamResult(false, "Exam not found.", null, 0); }
+        if (exam.getStatus() == CANCELLED) { return new ExamResult(false, "Cancelled exam cannot be edited.", examId, 0); }
+        if (exam.getStatus() == ExamStatus.COMPLETED) { return new ExamResult(false, "Completed exam cannot be edited.", examId, 0); }
 
         String validation = validateExamRequest(request, true);
 
@@ -173,10 +174,8 @@ public class ExamService {
 
         Exam savedExam = examRepository.save(exam);
 
-        deleteExamChildren(examId);
-
-        saveAssignments(savedExam, request.getClassOfferingIds(), schoolId, savedExam.getStatus());
-        saveQuestions(savedExam, request.getQuestions());
+        syncAssignments(savedExam, request.getClassOfferingIds(), schoolId, savedExam.getStatus());
+        syncQuestions(savedExam, request.getQuestions());
         saveViolationSettings(savedExam, request.getViolationSettings());
 
         return new ExamResult(
@@ -494,102 +493,6 @@ public class ExamService {
         );
     }
 
-    private String upsertFeedbackBlock(
-            String existing,
-            String blockTitle,
-            String newText
-    ) {
-        String safeText = newText == null || newText.isBlank()
-                ? "No feedback provided."
-                : newText.trim();
-
-        String newBlock = "[" + blockTitle + "]\n" + safeText;
-
-        if (existing == null || existing.isBlank()) {
-            return newBlock;
-        }
-
-        String startMarker = "[" + blockTitle + "]";
-        int start = existing.indexOf(startMarker);
-
-        if (start < 0) {
-            return existing.trim() + "\n\n" + newBlock;
-        }
-
-        int nextBlock = existing.indexOf("\n\n[", start + startMarker.length());
-
-        if (nextBlock < 0) {
-            return (
-                    existing.substring(0, start).trim() +
-                            "\n\n" +
-                            newBlock
-            ).trim();
-        }
-
-        return (
-                existing.substring(0, start).trim() +
-                        "\n\n" +
-                        newBlock +
-                        "\n\n" +
-                        existing.substring(nextBlock).trim()
-        ).trim();
-    }
-
-    private void recomputeAttemptScore(ExamAttempt attempt) {
-
-        BigDecimal totalScore =
-                answerRepository.sumPointsAwardedByAttemptId(
-                        attempt.getAttemptId()
-                );
-
-        BigDecimal totalPossible =
-                questionRepository.sumTotalPointsByExamId(
-                        attempt.getExamId()
-                );
-
-        if (totalScore == null) {
-            totalScore = BigDecimal.ZERO;
-        }
-
-        double percentage = 0.0;
-
-        if (totalPossible != null &&
-                totalPossible.compareTo(BigDecimal.ZERO) > 0) {
-
-            percentage = totalScore
-                    .divide(totalPossible, 4, RoundingMode.HALF_UP)
-                    .multiply(BigDecimal.valueOf(100))
-                    .doubleValue();
-        }
-
-        attempt.setTotalScore(totalScore.doubleValue());
-        attempt.setScorePercentage(percentage);
-
-        attemptRepository.save(attempt);
-    }
-
-    private void autoMarkReviewedIfNoManualReviewNeeded(ExamAttempt attempt) {
-
-        List<ExamAnswer> answers =
-                answerRepository.findByAttemptAttemptId(
-                        attempt.getAttemptId()
-                );
-
-        boolean needsReview = answers.stream()
-                .anyMatch(answer ->
-                        Boolean.TRUE.equals(answer.getNeedsChecking())
-                                || "PENDING".equalsIgnoreCase(answer.getReviewStatus())
-                                || "FLAGGED".equalsIgnoreCase(answer.getReviewStatus())
-                );
-
-        if (!needsReview) {
-            attempt.setReviewStatus("REVIEWED");
-            attempt.setReviewedAt(OffsetDateTime.now());
-            attempt.setReviewedBy("SYSTEM");
-            attemptRepository.save(attempt);
-        }
-    }
-
     @Transactional
     public ExamResult replaceUploadExamTemplate(Long examId, MultipartFile file) {
 
@@ -763,26 +666,6 @@ public class ExamService {
         );
     }
 
-    private void validateReviewerRole(String role) {
-        if (!"FACULTY".equalsIgnoreCase(role)
-                && !"ADMIN".equalsIgnoreCase(role)) {
-            throw new RuntimeException("Only faculty or admin can review answers.");
-        }
-    }
-
-    private void applyAutoCheckedOrFlaggedStatus(
-            ExamAnswer answer,
-            boolean hasViolation
-    ) {
-        if (hasViolation) {
-            answer.setNeedsChecking(true);
-            answer.setReviewStatus("FLAGGED");
-        } else {
-            answer.setNeedsChecking(false);
-            answer.setReviewStatus("AUTO_CHECKED");
-        }
-    }
-
     @Transactional
     public ExamResult submitExam(Long attemptId, String studentId) {
 
@@ -822,6 +705,486 @@ public class ExamService {
                 attempt.getExamId(),
                 1
         );
+    }
+
+    private String upsertFeedbackBlock(
+            String existing,
+            String blockTitle,
+            String newText
+    ) {
+        String safeText = newText == null || newText.isBlank()
+                ? "No feedback provided."
+                : newText.trim();
+
+        String newBlock = "[" + blockTitle + "]\n" + safeText;
+
+        if (existing == null || existing.isBlank()) {
+            return newBlock;
+        }
+
+        String startMarker = "[" + blockTitle + "]";
+        int start = existing.indexOf(startMarker);
+
+        if (start < 0) {
+            return existing.trim() + "\n\n" + newBlock;
+        }
+
+        int nextBlock = existing.indexOf("\n\n[", start + startMarker.length());
+
+        if (nextBlock < 0) {
+            return (
+                    existing.substring(0, start).trim() +
+                            "\n\n" +
+                            newBlock
+            ).trim();
+        }
+
+        return (
+                existing.substring(0, start).trim() +
+                        "\n\n" +
+                        newBlock +
+                        "\n\n" +
+                        existing.substring(nextBlock).trim()
+        ).trim();
+    }
+
+    @Transactional
+    public ExamTakingResponse beginExamAttempt(
+            Long examId,
+            String schoolId,
+            String role
+    ) {
+        /*
+         * This method is the real exam start gate.
+         *
+         * Important:
+         * - Lobby can open early.
+         * - This method blocks students until exact start time.
+         * - Timer starts here by setting attempt.startedAt.
+         */
+
+        if (!"STUDENT".equalsIgnoreCase(role)) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Only students can begin exams."
+            );
+        }
+
+        Exam exam = examRepository
+                .findById(examId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Exam not found."
+                ));
+
+        if (exam.getStartDateTime() == null || exam.getEndDateTime() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Exam schedule is invalid."
+            );
+        }
+
+        OffsetDateTime now = nowManila();
+
+        OffsetDateTime examStart = exam.getStartDateTime();
+        OffsetDateTime examEnd = exam.getEndDateTime();
+
+        OffsetDateTime startManila = toManila(examStart);
+        OffsetDateTime endManila = toManila(examEnd);
+
+        if (now.isBefore(startManila)) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "You cannot begin yet. The exam can only start at the scheduled start time."
+            );
+        }
+
+        if (now.isAfter(endManila)) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "This exam has already ended."
+            );
+        }
+
+        ExamTakingRawContent rawContent =
+                examTakingCacheService.getRawContent(examId);
+
+        Optional<ExamAttempt> existingAttempt =
+                attemptRepository.findByExamIdAndStudentId(examId, schoolId);
+
+        ExamAttempt attempt;
+
+        if (existingAttempt.isPresent()) {
+            attempt = existingAttempt.get();
+
+            if (attempt.getStatus() != ExamAttemptStatus.IN_PROGRESS) {
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "This exam attempt is already submitted."
+                );
+            }
+
+        } else {
+            attempt = createNewAttempt(
+                    exam,
+                    schoolId,
+                    rawContent.getQuestions(),
+                    rawContent.getChoiceMap()
+            );
+        }
+
+        /*
+         * Synchronous exam:
+         * Timer is based on official exam start.
+         *
+         * Asynchronous exam:
+         * Timer is based on when student actually clicks Begin Exam.
+         */
+        if (attempt.getStartedAt() == null) {
+            if (exam.getExamMode() == ExamMode.SYNCHRONOUS) {
+                attempt.setStartedAt(examStart);
+            } else {
+                attempt.setStartedAt(now);
+            }
+
+            attemptRepository.save(attempt);
+        }
+
+        int timeLimitMinutes =
+                exam.getTimeLimitMinutes() == null
+                        ? 60
+                        : exam.getTimeLimitMinutes();
+
+        OffsetDateTime timerStartedAt =
+                exam.getExamMode() == ExamMode.SYNCHRONOUS
+                        ? startManila
+                        : toManila(attempt.getStartedAt());
+
+        long elapsedSeconds =
+                java.time.Duration.between(timerStartedAt, now).getSeconds();
+
+        long remainingSeconds =
+                Math.max(0, (timeLimitMinutes * 60L) - elapsedSeconds);
+
+        if (remainingSeconds <= 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Your exam time has already ended."
+            );
+        }
+
+        ExamTakingResponse response =
+                getExamForTaking(examId, schoolId, role);
+
+        response.setAttemptStartedAt(attempt.getStartedAt());
+        response.setAttemptId(attempt.getAttemptId());
+        response.setServerNow(now);
+        response.setCanBeginExam(true);
+        response.setRemainingSeconds(remainingSeconds);
+
+        return response;
+    }
+
+    @Transactional
+    public SimpleMessageResponse applyViolationDecision(
+            ViolationDecisionRequest request,
+            String employeeId,
+            String role
+    ) {
+        validateRole(role);
+
+        ExamAnswer answer = answerRepository.findById(request.getAnswerId())
+                .orElseThrow(() -> new RuntimeException("Answer not found."));
+
+        BigDecimal currentScore = answer.getPointsAwarded() == null
+                ? BigDecimal.ZERO
+                : answer.getPointsAwarded();
+
+        BigDecimal deduction = request.getDeduction() == null
+                ? BigDecimal.ZERO
+                : request.getDeduction();
+
+        if (deduction.compareTo(BigDecimal.ZERO) < 0) {
+            throw new RuntimeException("Deduction cannot be negative.");
+        }
+
+        if (deduction.compareTo(currentScore) > 0) {
+            throw new RuntimeException("Deduction cannot be greater than current score.");
+        }
+
+        String decision = request.getDecision() == null
+                ? "IGNORED"
+                : request.getDecision().trim().toUpperCase();
+
+        if (!decision.equals("IGNORED") && !decision.equals("PENALIZED")) {
+            throw new RuntimeException("Invalid violation decision.");
+        }
+
+        BigDecimal scoreBefore = answer.getPointsAwarded() == null
+                ? BigDecimal.ZERO
+                : answer.getPointsAwarded();
+
+        BigDecimal scoreAfter = scoreBefore;
+
+        List<ExamViolationLog> violations =
+                violationLogRepository
+                        .findByAttemptAttemptIdAndQuestionQuestionId(
+                                request.getAttemptId(),
+                                request.getQuestionId()
+                        );
+
+        for (ExamViolationLog violation : violations) {
+
+            String previousStatus = violation.getReviewStatus();
+
+            BigDecimal previousDeduction =
+                    reviewLogRepository
+                            .findTopByViolationViolationIdAndActionTypeOrderByCreatedAtDesc(
+                                    violation.getViolationId(),
+                                    "VIOLATION_PENALIZED"
+                            )
+                            .map(ExamAnswerReviewLog::getDeduction)
+                            .orElse(BigDecimal.ZERO);
+
+            boolean wasPenalized =
+                    "PENALIZED".equalsIgnoreCase(previousStatus);
+
+            boolean nowPenalized =
+                    "PENALIZED".equalsIgnoreCase(decision);
+
+            // Restore previous penalty first if it was already penalized.
+            if (wasPenalized && previousDeduction.compareTo(BigDecimal.ZERO) > 0) {
+                scoreAfter = scoreAfter.add(previousDeduction);
+            }
+
+            // Apply new penalty if current decision is PENALIZED.
+            if (nowPenalized) {
+                if (deduction.compareTo(scoreAfter) > 0) {
+                    throw new RuntimeException(
+                            "Deduction cannot be greater than restored current score."
+                    );
+                }
+
+                scoreAfter = scoreAfter.subtract(deduction);
+            }
+
+            answer.setPointsAwarded(scoreAfter);
+        }
+
+        OffsetDateTime reviewedAt = OffsetDateTime.now();
+
+        for (ExamViolationLog violation : violations) {
+
+            String previousStatus = violation.getReviewStatus();
+
+            violation.setReviewStatus(decision);
+            violation.setReviewedBy(employeeId);
+            violation.setReviewedAt(reviewedAt);
+            violation.setReviewNotes(request.getFeedback());
+            violationLogRepository.save(violation);
+
+            ExamAnswerReviewLog log = new ExamAnswerReviewLog();
+
+            log.setExam(violation.getExam());
+            log.setAttempt(violation.getAttempt());
+            log.setAnswer(answer);
+            log.setQuestion(violation.getQuestion());
+            log.setViolation(violation);
+            log.setActionType( "PENALIZED".equalsIgnoreCase(decision) ? "VIOLATION_PENALIZED" : "VIOLATION_IGNORED");
+            log.setPreviousValue(previousStatus);
+            log.setNewValue(decision);
+            log.setScoreBefore(scoreBefore);
+            log.setScoreAfter(scoreAfter);
+            log.setDeduction(deduction);
+            log.setNotes(request.getFeedback());
+            log.setCreatedBy(employeeId);
+            log.setCreatedByRole(role);
+            reviewLogRepository.save(log);
+        }
+
+        answer.setManuallyReviewed(true);
+        answer.setNeedsChecking(false);
+        answer.setReviewStatus("REVIEWED");
+        answerRepository.save(answer);
+
+        violationLogRepository.markQuestionViolationsReviewed(
+                request.getAttemptId(),
+                request.getQuestionId(),
+                decision,
+                employeeId,
+                OffsetDateTime.now()
+        );
+
+        return new SimpleMessageResponse(true, "Violation decision saved.");
+    }
+
+    private ExamAttempt createNewAttempt(
+            Exam exam,
+            String username,
+            List<ExamQuestion> dbQuestions,
+            Map<Long, List<ExamChoice>> choiceMap
+    ) {
+        /*
+         * This creates an attempt shell.
+         *
+         * It is allowed during lobby time.
+         * It saves stable question and choice order.
+         * It must NOT start the timer.
+         */
+
+        List<ExamQuestion> normalQuestions = new ArrayList<>();
+        List<ExamQuestion> essayQuestions = new ArrayList<>();
+
+        for (ExamQuestion question : dbQuestions) {
+            if (question.getQuestionType() == QuestionType.ESSAY) {
+                essayQuestions.add(question);
+            } else {
+                normalQuestions.add(question);
+            }
+        }
+
+        if (Boolean.TRUE.equals(exam.getShuffleQuestions())) {
+            Collections.shuffle(normalQuestions);
+            Collections.shuffle(essayQuestions);
+        }
+
+        List<ExamQuestion> finalQuestions = new ArrayList<>();
+        finalQuestions.addAll(normalQuestions);
+        finalQuestions.addAll(essayQuestions);
+
+        List<Long> finalQuestionIds = finalQuestions.stream()
+                .map(ExamQuestion::getQuestionId)
+                .toList();
+
+        ExamAttempt attempt = new ExamAttempt();
+        attempt.setExamId(exam.getExamId());
+        attempt.setStudentId(username);
+        attempt.setStatus(ExamAttemptStatus.IN_PROGRESS);
+
+        /*
+         * Do not set startedAt here.
+         * If we set it during lobby, the timer will start too early.
+         */
+        attempt.setStartedAt(null);
+
+        attempt.setQuestionOrder(toJsonList(finalQuestionIds));
+
+        attempt = attemptRepository.save(attempt);
+
+        List<ExamAttemptChoiceOrder> choiceOrdersToSave = new ArrayList<>();
+
+        for (ExamQuestion question : finalQuestions) {
+            List<ExamChoice> choices = new ArrayList<>(
+                    choiceMap.getOrDefault(
+                            question.getQuestionId(),
+                            new ArrayList<>()
+                    )
+            );
+
+            List<ExamChoice> normalChoices = new ArrayList<>();
+            List<ExamChoice> noneOfTheAboveChoices = new ArrayList<>();
+
+            for (ExamChoice choice : choices) {
+                String text = choice.getChoiceText();
+
+                if (text != null && text.trim().equalsIgnoreCase("None of the above")) {
+                    noneOfTheAboveChoices.add(choice);
+                } else {
+                    normalChoices.add(choice);
+                }
+            }
+
+            if (Boolean.TRUE.equals(exam.getShuffleChoices())) {
+                Collections.shuffle(normalChoices);
+            }
+
+            List<ExamChoice> finalChoices = new ArrayList<>();
+            finalChoices.addAll(normalChoices);
+            finalChoices.addAll(noneOfTheAboveChoices);
+
+            List<Long> finalChoiceIds = finalChoices.stream()
+                    .map(ExamChoice::getChoiceId)
+                    .toList();
+
+            ExamAttemptChoiceOrder order = new ExamAttemptChoiceOrder();
+            order.setAttemptId(attempt.getAttemptId());
+            order.setQuestionId(question.getQuestionId());
+            order.setChoiceOrder(toJsonList(finalChoiceIds));
+
+            choiceOrdersToSave.add(order);
+        }
+
+        attemptChoiceOrderRepository.saveAll(choiceOrdersToSave);
+
+        return attempt;
+    }
+
+    private void recomputeAttemptScore(ExamAttempt attempt) {
+
+        BigDecimal totalScore =
+                answerRepository.sumPointsAwardedByAttemptId(
+                        attempt.getAttemptId()
+                );
+
+        BigDecimal totalPossible =
+                questionRepository.sumTotalPointsByExamId(
+                        attempt.getExamId()
+                );
+
+        if (totalScore == null) {
+            totalScore = BigDecimal.ZERO;
+        }
+
+        double percentage = 0.0;
+
+        if (totalPossible != null &&
+                totalPossible.compareTo(BigDecimal.ZERO) > 0) {
+
+            percentage = totalScore
+                    .divide(totalPossible, 4, RoundingMode.HALF_UP)
+                    .multiply(BigDecimal.valueOf(100))
+                    .doubleValue();
+        }
+
+        attempt.setTotalScore(totalScore.doubleValue());
+        attempt.setScorePercentage(percentage);
+
+        attemptRepository.save(attempt);
+    }
+
+    private void autoMarkReviewedIfNoManualReviewNeeded(ExamAttempt attempt) {
+
+        List<ExamAnswer> answers =
+                answerRepository.findByAttemptAttemptId(
+                        attempt.getAttemptId()
+                );
+
+        boolean needsReview = answers.stream()
+                .anyMatch(answer ->
+                        Boolean.TRUE.equals(answer.getNeedsChecking())
+                                || "PENDING".equalsIgnoreCase(answer.getReviewStatus())
+                                || "FLAGGED".equalsIgnoreCase(answer.getReviewStatus())
+                );
+
+        if (!needsReview) {
+            attempt.setReviewStatus("REVIEWED");
+            attempt.setReviewedAt(OffsetDateTime.now());
+            attempt.setReviewedBy("SYSTEM");
+            attemptRepository.save(attempt);
+        }
+    }
+
+    private void applyAutoCheckedOrFlaggedStatus(
+            ExamAnswer answer,
+            boolean hasViolation
+    ) {
+        if (hasViolation) {
+            answer.setNeedsChecking(true);
+            answer.setReviewStatus("FLAGGED");
+        } else {
+            answer.setNeedsChecking(false);
+            answer.setReviewStatus("AUTO_CHECKED");
+        }
     }
 
     private void ensureAllQuestionsHaveAnswers(
@@ -869,39 +1232,42 @@ public class ExamService {
         }
     }
 
-    private void saveViolationSettings(Exam exam, List<ViolationSettingRequest> settings) {
-        examViolationSettingRepository.deleteByExamExamId(exam.getExamId());
+    private void saveViolationSettings(
+            Exam exam,
+            List<ViolationSettingRequest> requests
+    ) {
 
-        if (settings == null || settings.isEmpty()) {
+        examViolationSettingRepository.deleteByExamIdNow(exam.getExamId());
+        examViolationSettingRepository.flush();
+
+        if (requests == null || requests.isEmpty()) {
             return;
         }
 
-        List<ExamViolationSetting> rows = new ArrayList<>();
+        List<ExamViolationSetting> settings = requests.stream()
+                .map(request -> {
 
-        for (ViolationSettingRequest request : settings) {
-            if (request == null || request.getViolationType() == null) {
-                continue;
-            }
+                    ExamViolationSetting setting =
+                            new ExamViolationSetting();
 
-            ExamViolationSetting setting = new ExamViolationSetting();
-            setting.setExam(exam);
-            setting.setViolationType(request.getViolationType());
-            setting.setEnabled(Boolean.TRUE.equals(request.getEnabled()));
-            setting.setSeverity(
-                    request.getSeverity() == null || request.getSeverity().isBlank()
-                            ? "MINOR"
-                            : request.getSeverity()
-            );
-            setting.setMaxAllowedCount(
-                    request.getMaxAllowedCount() == null
-                            ? 0
-                            : request.getMaxAllowedCount()
-            );
+                    setting.setExam(exam);
+                    setting.setViolationType(request.getViolationType());
 
-            rows.add(setting);
-        }
+                    setting.setEnabled(request.getEnabled());
 
-        examViolationSettingRepository.saveAll(rows);
+                    setting.setSeverity(
+                            request.getSeverity()
+                    );
+
+                    setting.setMaxAllowedCount(
+                            request.getMaxAllowedCount()
+                    );
+
+                    return setting;
+                })
+                .toList();
+
+        examViolationSettingRepository.saveAll(settings);
     }
 
     private ExamResult createExam(
@@ -947,42 +1313,41 @@ public class ExamService {
         );
     }
 
+    /**
+     *
+     * @param role
+     * @param schoolId
+     * @return
+     */
     public List<ExamResponse> getAllExams(String role, String schoolId) {
+
         long start = System.currentTimeMillis();
 
         List<Exam> exams;
 
-        if ("ADMIN".equalsIgnoreCase(role)) {
-            exams = examRepository.findAll();
+        // ADMIN GETS ALL EXAM
+        if ("ADMIN".equalsIgnoreCase(role)) { exams = examRepository.findAll(); }
 
-        } else if ("FACULTY".equalsIgnoreCase(role)) {
-            exams = examRepository.findVisibleExamsForFaculty(schoolId);
-
-        } else if ("STUDENT".equalsIgnoreCase(role)) {
-            exams = examRepository.findAvailableExamsForStudent(schoolId);
-
-        } else {
-            return List.of();
+        // FACULTY GET EXAMS ASSIGNED TO HIS/HER
+        else if ("FACULTY".equalsIgnoreCase(role)) { exams = examRepository.findVisibleExamsForFaculty(schoolId);
         }
 
-        if (exams.isEmpty()) {
-            return List.of();
-        }
+        // EMPTY LIST
+        else { return List.of(); }
 
-        List<Long> examIds = exams.stream()
-                .map(Exam::getExamId)
-                .toList();
 
-        List<ExamAssignment> allAssignments =
-                assignmentRepository.findByExamExamIdIn(examIds);
+        if (exams.isEmpty()) { return List.of(); }
 
-        Map<Long, List<ExamAssignment>> assignmentMap =
-                allAssignments.stream()
-                        .collect(Collectors.groupingBy(a -> a.getExam().getExamId()));
+        // Get the examIds
+        List<Long> examIds = exams.stream().map(Exam::getExamId).toList();
 
-        List<Object[]> takerRows =
-                examRepository.countTakersByExamIds(examIds);
+        // Get all assigned exams based on examIds
+        List<ExamAssignment> allAssignments = assignmentRepository.findByExamExamIdIn(examIds);
+        Map<Long, List<ExamAssignment>> assignmentMap = allAssignments.stream() .collect(Collectors.groupingBy(
+                a -> a.getExam().getExamId()));
 
+        // Count the student takers
+        List<Object[]> takerRows = examRepository.countTakersByExamIds(examIds);
         Map<Long, Integer> takerMap = new HashMap<>();
 
         for (Object[] row : takerRows) {
@@ -991,9 +1356,8 @@ public class ExamService {
             takerMap.put(rowExamId, count.intValue());
         }
 
-        List<Object[]> submittedRows =
-                examRepository.countSubmittedTakersByExamIds(examIds);
-
+        // Count the students submitted exams
+        List<Object[]> submittedRows = examRepository.countSubmittedTakersByExamIds(examIds);
         Map<Long, Integer> submittedMap = new HashMap<>();
 
         for (Object[] row : submittedRows) {
@@ -1002,6 +1366,7 @@ public class ExamService {
             submittedMap.put(rowExamId, count.intValue());
         }
 
+        /* Format the display name (i.e: Juan Dela Cruz(Faculty)) */
         Map<String, String> userDisplayMap =
                 buildUserDisplayMap(
                         exams.stream()
@@ -1019,8 +1384,8 @@ public class ExamService {
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
 
-        Map<String, String> classOfferingDisplayMap =
-                buildClassOfferingDisplayMap(classOfferingIds);
+        Map<String, ClassOfferingMeta> classOfferingMetaMap =
+                buildClassOfferingMetaMap(classOfferingIds);
 
         long mapStart = System.currentTimeMillis();
 
@@ -1040,14 +1405,13 @@ public class ExamService {
                             getValidUntil(assignments),
                             determineStatus(exam, assignments),
                             formatDuration(exam.getTimeLimitMinutes()),
-
-                            formatAssignedTo(assignments, classOfferingDisplayMap),
-
+                            formatAssignedTo(assignments, classOfferingMetaMap),
+                            getTerm(assignments, classOfferingMetaMap),
+                            getAcademicYear(assignments, classOfferingMetaMap),
                             formatTakers(submittedTakers, totalTakers),
                             formatDateTime(exam.getStartDateTime()),
                             formatDateTime(exam.getEndDateTime()),
                             exam.getExamMode() == null ? "" : exam.getExamMode().name(),
-
                             userDisplayMap.getOrDefault(exam.getCreatedBy(), exam.getCreatedBy()),
                             userDisplayMap.getOrDefault(exam.getUpdatedBy(), exam.getUpdatedBy())
                     );
@@ -1055,82 +1419,6 @@ public class ExamService {
                 .toList();
 
         return responses;
-    }
-
-    private Map<String, String> buildClassOfferingDisplayMap(Set<String> classOfferingIds) {
-        if (classOfferingIds == null || classOfferingIds.isEmpty()) {
-            return Map.of();
-        }
-
-        return classOfferingCacheRepository.findAllById(classOfferingIds)
-                .stream()
-                .collect(Collectors.toMap(
-                        ClassOfferingCache::getClassOfferingId,
-                        ClassOfferingCache::getProgramCode,
-                        (existing, duplicate) -> existing
-                ));
-    }
-
-    private Map<String, String> buildUserDisplayMap(Set<String> schoolIdsOrEmployeeIds) {
-        if (schoolIdsOrEmployeeIds == null || schoolIdsOrEmployeeIds.isEmpty()) {
-            return Map.of();
-        }
-
-        Set<String> ids = schoolIdsOrEmployeeIds.stream()
-                .filter(Objects::nonNull)
-                .map(String::trim)
-                .filter(id -> !id.isBlank())
-                .collect(Collectors.toSet());
-
-        if (ids.isEmpty()) {
-            return Map.of();
-        }
-
-        Map<String, AdminProfile> adminProfileMap =
-                adminProfileRepository.findByEmployeeIdIn(ids)
-                        .stream()
-                        .collect(Collectors.toMap(
-                                AdminProfile::getEmployeeId,
-                                p -> p,
-                                (existing, duplicate) -> existing
-                        ));
-
-        Map<String, FacultyProfileCache> facultyProfileMap =
-                facultyProfileCacheRepository.findByEmployeeIdIn(ids)
-                        .stream()
-                        .collect(Collectors.toMap(
-                                FacultyProfileCache::getEmployeeId,
-                                p -> p,
-                                (existing, duplicate) -> existing
-                        ));
-
-        Map<String, String> result = new HashMap<>();
-
-        for (String id : ids) {
-            AdminProfile admin = adminProfileMap.get(id);
-
-            if (admin != null) {
-                result.put(
-                        id,
-                        admin.getFirstName() + " " + admin.getLastName() + " (Admin)"
-                );
-                continue;
-            }
-
-            FacultyProfileCache faculty = facultyProfileMap.get(id);
-
-            if (faculty != null) {
-                result.put(
-                        id,
-                        faculty.getFirstName() + " " + faculty.getLastName() + " (Faculty)"
-                );
-                continue;
-            }
-
-            result.put(id, id);
-        }
-
-        return result;
     }
 
     public ExamResponse viewExam(Long examId, String userId, String role) {
@@ -1141,10 +1429,35 @@ public class ExamService {
         List<ExamAssignment> assignments =
                 assignmentRepository.findByExamExamId(examId);
 
-        List<String> classOfferingIds = assignments.stream()
+        boolean isAdmin = "ADMIN".equalsIgnoreCase(role);
+        boolean isFaculty = "FACULTY".equalsIgnoreCase(role);
+
+        if (isFaculty) {
+            boolean createdByFaculty = Objects.equals(exam.getCreatedBy(), userId);
+
+            boolean assignedToFaculty = assignments.stream()
+                    .map(ExamAssignment::getClassOfferingId)
+                    .filter(Objects::nonNull)
+                    .anyMatch(classOfferingId ->
+                            facultyLoadCacheRepository.existsByEmployeeIdAndClassOfferingId(
+                                    userId,
+                                    classOfferingId
+                            )
+                    );
+
+            if (!createdByFaculty && !assignedToFaculty) {
+                throw new RuntimeException("You are not authorized to view this exam.");
+            }
+        }
+
+        if (!isAdmin && !isFaculty) {
+            throw new RuntimeException("You are not authorized to view this exam.");
+        }
+
+        Set<String> classOfferingIds = assignments.stream()
                 .map(ExamAssignment::getClassOfferingId)
-                .distinct()
-                .toList();
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
 
         List<ExamQuestion> questions =
                 questionRepository.findByExamExamIdOrderByQuestionOrderAsc(examId);
@@ -1212,9 +1525,7 @@ public class ExamService {
         Integer totalTakers = examRepository.countTakersByExamId(exam.getExamId());
         Integer submittedTakers = examRepository.countSubmittedTakersByExamId(exam.getExamId());
 
-        Set<String> offeringIdSet = new HashSet<>(classOfferingIds);
-        Map<String, String> classOfferingDisplayMap =
-                buildClassOfferingDisplayMap(offeringIdSet);
+        Map<String, ClassOfferingMeta> classOfferingMetaMap = buildClassOfferingMetaMap(classOfferingIds);
 
         Map<String, String> userDisplayMap =
                 buildUserDisplayMap(
@@ -1232,7 +1543,9 @@ public class ExamService {
                 getValidUntil(assignments),
                 determineStatus(exam, assignments),
                 formatDuration(exam.getTimeLimitMinutes()),
-                formatAssignedTo(assignments, classOfferingDisplayMap),
+                formatAssignedTo(assignments, classOfferingMetaMap),
+                getTerm(assignments, classOfferingMetaMap),
+                getAcademicYear(assignments, classOfferingMetaMap),
                 formatTakers(submittedTakers, totalTakers),
                 formatDateTime(exam.getStartDateTime()),
                 formatDateTime(exam.getEndDateTime()),
@@ -1242,7 +1555,7 @@ public class ExamService {
                 questionPreviews
         );
 
-        response.setClassOfferingIds(classOfferingIds);
+        response.setClassOfferingIds(new ArrayList<>(classOfferingIds));
         response.setTimeLimitMinutes(exam.getTimeLimitMinutes());
         response.setShuffleQuestions(exam.getShuffleQuestions());
         response.setShuffleChoices(exam.getShuffleChoices());
@@ -1250,6 +1563,88 @@ public class ExamService {
         response.setRawEndDateTime(exam.getEndDateTime());
 
         return response;
+    }
+
+    private Map<String, ClassOfferingMeta> buildClassOfferingMetaMap(Set<String> classOfferingIds) {
+
+        if (classOfferingIds == null || classOfferingIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return classOfferingCacheRepository
+                .findByClassOfferingIdIn(new ArrayList<>(classOfferingIds))
+                .stream()
+                .collect(Collectors.toMap(
+                        co -> co.getClassOfferingId(),
+                        co -> new ClassOfferingMeta(
+                                co.getProgramCode(),
+                                co.getTerm(),
+                                co.getAcademicYear()
+                        ),
+                        (a, b) -> a
+                ));
+    }
+
+    private Map<String, String> buildUserDisplayMap(Set<String> schoolIdsOrEmployeeIds) {
+        if (schoolIdsOrEmployeeIds == null || schoolIdsOrEmployeeIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Set<String> ids = schoolIdsOrEmployeeIds.stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(id -> !id.isBlank())
+                .collect(Collectors.toSet());
+
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<String, AdminProfile> adminProfileMap =
+                adminProfileRepository.findByEmployeeIdIn(ids)
+                        .stream()
+                        .collect(Collectors.toMap(
+                                AdminProfile::getEmployeeId,
+                                p -> p,
+                                (existing, duplicate) -> existing
+                        ));
+
+        Map<String, FacultyProfileCache> facultyProfileMap =
+                facultyProfileCacheRepository.findByEmployeeIdIn(ids)
+                        .stream()
+                        .collect(Collectors.toMap(
+                                FacultyProfileCache::getEmployeeId,
+                                p -> p,
+                                (existing, duplicate) -> existing
+                        ));
+
+        Map<String, String> result = new HashMap<>();
+
+        for (String id : ids) {
+            AdminProfile admin = adminProfileMap.get(id);
+
+            if (admin != null) {
+                result.put(
+                        id,
+                        admin.getFirstName() + " " + admin.getLastName() + " (Admin)"
+                );
+                continue;
+            }
+
+            FacultyProfileCache faculty = facultyProfileMap.get(id);
+
+            if (faculty != null) {
+                result.put(
+                        id,
+                        faculty.getFirstName() + " " + faculty.getLastName() + " (Faculty)"
+                );
+                continue;
+            }
+
+            result.put(id, id);
+        }
+
+        return result;
     }
 
     public List<ClassOfferingResponse> getClassOfferings(String schoolId, String role) {
@@ -1396,37 +1791,69 @@ public class ExamService {
             String schoolId,
             String role
     ) {
+        /*
+         * This method prepares the lobby/taking data.
+         *
+         * Important:
+         * - Student may enter lobby 15 minutes before start.
+         * - Student must NOT start answering here.
+         * - Timer starts only in beginExamAttempt().
+         */
+
         if (!"STUDENT".equalsIgnoreCase(role)) {
-            throw new RuntimeException("Only students can take exams.");
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Only students can take exams."
+            );
         }
 
         ExamTakingRawContent rawContent =
                 examTakingCacheService.getRawContent(examId);
 
+        if (rawContent == null || rawContent.getExam() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Exam not found."
+            );
+        }
+
         Exam exam = rawContent.getExam();
-        List<ExamQuestion> dbQuestions = rawContent.getQuestions();
-        Map<Long, List<ExamChoice>> choiceMap = rawContent.getChoiceMap();
 
-        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        if (exam.getStartDateTime() == null || exam.getEndDateTime() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Exam schedule is invalid."
+            );
+        }
 
+        OffsetDateTime now = nowManila();
         OffsetDateTime examStart = exam.getStartDateTime();
         OffsetDateTime examEnd = exam.getEndDateTime();
 
-        if (examStart == null || examEnd == null) {
-            throw new RuntimeException("Exam schedule is invalid.");
-        }
-
-        OffsetDateTime lobbyOpenAt = examStart.minusMinutes(15);
+        OffsetDateTime startManila = toManila(examStart);
+        OffsetDateTime endManila = toManila(examEnd);
+        OffsetDateTime lobbyOpenAt = startManila.minusMinutes(LOBBY_OPEN_MINUTES_BEFORE_START);
 
         if (now.isBefore(lobbyOpenAt)) {
-            throw new RuntimeException("Lobby will open 15 minutes before the exam starts.");
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Lobby opens 15 minutes before the exam start time."
+            );
         }
 
-        if (!now.isBefore(examEnd)) {
-            throw new RuntimeException("This exam has already ended.");
+        if (now.isAfter(endManila)) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "This exam has already ended."
+            );
         }
 
-        boolean canBeginExam = !now.isBefore(examStart);
+        boolean canBeginExam =
+                !now.isBefore(startManila)
+                        && !now.isAfter(endManila);
+
+        List<ExamQuestion> dbQuestions = rawContent.getQuestions();
+        Map<Long, List<ExamChoice>> choiceMap = rawContent.getChoiceMap();
 
         Optional<ExamAttempt> existingAttempt =
                 attemptRepository.findByExamIdAndStudentId(examId, schoolId);
@@ -1437,41 +1864,46 @@ public class ExamService {
             attempt = existingAttempt.get();
 
             if (attempt.getStatus() != ExamAttemptStatus.IN_PROGRESS) {
-                throw new RuntimeException("This exam attempt is already submitted.");
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "This exam attempt is already submitted."
+                );
             }
 
         } else {
-            attempt = null;
+            /*
+             * This creates the attempt shell only.
+             * It stores question/choice order for consistency.
+             * It does NOT start the timer.
+             */
+            attempt = createNewAttempt(
+                    exam,
+                    schoolId,
+                    dbQuestions,
+                    choiceMap
+            );
         }
-
 
         int timeLimitMinutes =
                 exam.getTimeLimitMinutes() == null
                         ? 60
                         : exam.getTimeLimitMinutes();
 
-        OffsetDateTime effectiveExpireAt =
-                exam.getExamMode() == ExamMode.SYNCHRONOUS
-                        ? examStart.plusMinutes(timeLimitMinutes)
-                        : examEnd;
-
-        if (exam.getExamMode() == ExamMode.ASYNCHRONOUS && !now.isBefore(examEnd)) {
-            throw new RuntimeException("This exam has already ended.");
-        }
-
         long remainingSeconds = timeLimitMinutes * 60L;
 
-        OffsetDateTime timerStartedAt = null;
+        /*
+         * Timer only counts after startedAt is set.
+         * startedAt is set only by beginExamAttempt().
+         */
+        if (attempt.getStartedAt() != null) {
+            OffsetDateTime timerStartedAt;
 
-        if (attempt != null && attempt.getStartedAt() != null) {
             if (exam.getExamMode() == ExamMode.SYNCHRONOUS) {
-                timerStartedAt = examStart;
+                timerStartedAt = startManila;
             } else {
-                timerStartedAt = attempt.getStartedAt();
+                timerStartedAt = toManila(attempt.getStartedAt());
             }
-        }
 
-        if (timerStartedAt != null) {
             long elapsedSeconds =
                     java.time.Duration.between(timerStartedAt, now).getSeconds();
 
@@ -1481,47 +1913,29 @@ public class ExamService {
 
         List<ExamQuestion> finalQuestions;
 
-        if (attempt != null && attempt.getQuestionOrder() != null) {
+        if (attempt.getQuestionOrder() != null) {
             List<Long> savedQuestionOrder = fromJsonList(attempt.getQuestionOrder());
             finalQuestions = applyQuestionOrder(dbQuestions, savedQuestionOrder);
         } else {
             finalQuestions = dbQuestions;
         }
 
-        final Map<Long, List<Long>> savedChoiceOrderMap;
+        Map<Long, List<Long>> savedChoiceOrderMap =
+                attemptChoiceOrderRepository.findByAttemptId(attempt.getAttemptId())
+                        .stream()
+                        .collect(Collectors.toMap(
+                                ExamAttemptChoiceOrder::getQuestionId,
+                                item -> fromJsonList(item.getChoiceOrder())
+                        ));
 
-        if (attempt != null) {
-
-            savedChoiceOrderMap =
-                    attemptChoiceOrderRepository.findByAttemptId(
-                                    attempt.getAttemptId()
-                            )
-                            .stream()
-                            .collect(Collectors.toMap(
-                                    ExamAttemptChoiceOrder::getQuestionId,
-                                    item -> fromJsonList(item.getChoiceOrder())
-
-                            ));
-
-        } else {
-
-            savedChoiceOrderMap = new HashMap<>();
-        }
-
-        final Map<Long, ExamAnswer> savedAnswerMap;
-
-        if (attempt != null) {
-            savedAnswerMap =
-                    answerRepository.findByAttemptAttemptId(attempt.getAttemptId())
-                            .stream()
-                            .collect(Collectors.toMap(
-                                    answer -> answer.getQuestion().getQuestionId(),
-                                    answer -> answer,
-                                    (existing, duplicate) -> existing
-                            ));
-        } else {
-            savedAnswerMap = new HashMap<>();
-        }
+        Map<Long, ExamAnswer> savedAnswerMap =
+                answerRepository.findByAttemptAttemptId(attempt.getAttemptId())
+                        .stream()
+                        .collect(Collectors.toMap(
+                                answer -> answer.getQuestion().getQuestionId(),
+                                answer -> answer,
+                                (existing, duplicate) -> existing
+                        ));
 
         List<Long> questionIds = dbQuestions.stream()
                 .map(ExamQuestion::getQuestionId)
@@ -1621,7 +2035,7 @@ public class ExamService {
                         .toList();
 
         ExamTakingResponse response = new ExamTakingResponse(
-                attempt == null ? null : attempt.getAttemptId(),
+                attempt.getAttemptId(),
                 exam.getExamId(),
                 exam.getTitle(),
                 exam.getDescription(),
@@ -1635,97 +2049,8 @@ public class ExamService {
 
         response.setServerNow(now);
         response.setLobbyOpenAt(lobbyOpenAt);
-        response.setAttemptStartedAt(attempt == null ? null : attempt.getStartedAt());
-        response.setCanBeginExam(canBeginExam);
-        response.setRemainingSeconds(remainingSeconds);
-
-        return response;
-    }
-
-    @Transactional
-    public ExamTakingResponse beginExamAttempt(
-            Long examId,
-            String schoolId,
-            String role
-    ) {
-        if (!"STUDENT".equalsIgnoreCase(role)) {
-            throw new RuntimeException("Only students can begin exams.");
-        }
-
-        Exam exam = examRepository
-                .findById(examId)
-                .orElseThrow(() -> new RuntimeException("Exam not found."));
-
-        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-
-        if (exam.getStartDateTime() == null || exam.getEndDateTime() == null) {
-            throw new RuntimeException("Exam schedule is invalid.");
-        }
-
-        if (!now.isBefore(exam.getEndDateTime())) {
-            throw new RuntimeException("This exam has already ended.");
-        }
-
-        if (exam.getExamMode() == ExamMode.SYNCHRONOUS
-                && now.isBefore(exam.getStartDateTime())) {
-            throw new RuntimeException("Exam has not started yet.");
-        }
-
-        ExamTakingRawContent rawContent =
-                examTakingCacheService.getRawContent(examId);
-
-        Optional<ExamAttempt> existingAttempt =
-                attemptRepository.findByExamIdAndStudentId(examId, schoolId);
-
-        ExamAttempt attempt;
-
-        if (existingAttempt.isPresent()) {
-            attempt = existingAttempt.get();
-
-            if (attempt.getStatus() != ExamAttemptStatus.IN_PROGRESS) {
-                throw new RuntimeException("This exam attempt is already submitted.");
-            }
-
-        } else {
-            attempt = createNewAttempt(
-                    exam,
-                    schoolId,
-                    rawContent.getQuestions(),
-                    rawContent.getChoiceMap()
-            );
-        }
-
-        if (exam.getExamMode() == ExamMode.SYNCHRONOUS) {
-            attempt.setStartedAt(exam.getStartDateTime());
-        } else {
-            if (attempt.getStartedAt() == null) {
-                attempt.setStartedAt(now);
-            }
-        }
-
-        attemptRepository.save(attempt);
-
-        long elapsedSeconds =
-                java.time.Duration.between(
-                        attempt.getStartedAt(),
-                        now
-                ).getSeconds();
-
-        int timeLimitMinutes =
-                exam.getTimeLimitMinutes() == null
-                        ? 60
-                        : exam.getTimeLimitMinutes();
-
-        long remainingSeconds =
-                Math.max(0, (timeLimitMinutes * 60L) - elapsedSeconds);
-
-        ExamTakingResponse response =
-                getExamForTaking(examId, schoolId, role);
-
         response.setAttemptStartedAt(attempt.getStartedAt());
-        response.setAttemptId(attempt.getAttemptId());
-        response.setServerNow(now);
-        response.setCanBeginExam(true);
+        response.setCanBeginExam(canBeginExam);
         response.setRemainingSeconds(remainingSeconds);
 
         return response;
@@ -1749,47 +2074,23 @@ public class ExamService {
                 .toList();
     }
 
-    // VALIDATION
+    // =====================
+    // QUESTION VALIDATION
+    // =====================
 
     private String validateExamRequest(ExamRequest request, boolean editMode) {
 
         OffsetDateTime minimumStart = OffsetDateTime.now().plusHours(1);
 
-        if (request == null) {
-            return "Invalid exam request.";
-        }
-
-        if (isBlank(request.getTitle())) {
-            return "Exam title is required.";
-        }
-
-        if (request.getTimeLimitMinutes() != null && request.getTimeLimitMinutes() <= 0) {
-            return "Time limit must be greater than zero.";
-        }
-
-        if (request.getStartDateTime() == null) {
-            throw new RuntimeException("Start date and time is required.");
-        }
-
-        if (request.getEndDateTime() == null) {
-            throw new RuntimeException("End date and time is required.");
-        }
-
-        if (!request.getEndDateTime().isAfter(request.getStartDateTime())) {
-            throw new RuntimeException("End date and time must be after start date and time.");
-        }
-
-        if (!editMode && request.getStartDateTime().isBefore(minimumStart)) {
-            return "Exam start time must be at least 1 hour from now.";
-        }
-
-        if (request.getExamMode() == null || request.getExamMode().isBlank()) {
-            throw new RuntimeException("Exam mode is required.");
-        }
-
-        if (request.getQuestions() == null || request.getQuestions().isEmpty()) {
-            return "At least one question is required.";
-        }
+        if (request == null) { return "Invalid exam request."; }
+        if (isBlank(request.getTitle())) { return "Exam title is required.";        }
+        if (request.getTimeLimitMinutes() != null && request.getTimeLimitMinutes() <= 0) { return "Time limit must be greater than zero."; }
+        if (request.getStartDateTime() == null) { throw new RuntimeException("Start date and time is required."); }
+        if (request.getEndDateTime() == null) { throw new RuntimeException("End date and time is required."); }
+        if (!request.getEndDateTime().isAfter(request.getStartDateTime())) { throw new RuntimeException("End date and time must be after start date and time."); }
+        if (!editMode && request.getStartDateTime().isBefore(minimumStart)) { return "Exam start time must be at least 1 hour from now."; }
+        if (request.getExamMode() == null || request.getExamMode().isBlank()) { throw new RuntimeException("Exam mode is required."); }
+        if (request.getQuestions() == null || request.getQuestions().isEmpty()) { return "At least one question is required.";  }
 
         try {
             ExamMode.valueOf(request.getExamMode().toUpperCase());
@@ -1922,7 +2223,9 @@ public class ExamService {
                 || "ESSAY".equals(type);
     }
 
-    // HELPER
+    // =====================
+    // EMAIL NOTIFICATION
+    // =====================
 
     private void notifyStudents(
             Exam exam,
@@ -1980,91 +2283,68 @@ public class ExamService {
         }
     }
 
-    private ExamAttempt createNewAttempt(
-            Exam exam,
-            String username,
-            List<ExamQuestion> dbQuestions,
-            Map<Long, List<ExamChoice>> choiceMap
+    // =====================
+    // HELPERS
+    // =====================
+
+
+
+    private record ClassOfferingMeta(
+            String displayName,
+            String term,
+            String academicYear
+    ) {}
+
+    private String getTerm(
+            List<ExamAssignment> assignments,
+            Map<String, ClassOfferingMeta> metaMap
     ) {
-        List<ExamQuestion> normalQuestions = new ArrayList<>();
-        List<ExamQuestion> essayQuestions = new ArrayList<>();
+        return assignments.stream()
+                .map(ExamAssignment::getClassOfferingId)
+                .filter(Objects::nonNull)
+                .map(metaMap::get)
+                .filter(Objects::nonNull)
+                .map(ClassOfferingMeta::term)
+                .filter(Objects::nonNull)
+                .filter(s -> !s.isBlank())
+                .findFirst()
+                .orElse("");
+    }
 
-        for (ExamQuestion question : dbQuestions) {
-            if (question.getQuestionType() == QuestionType.ESSAY) {
-                essayQuestions.add(question);
-            } else {
-                normalQuestions.add(question);
-            }
+    private String getAcademicYear(
+            List<ExamAssignment> assignments,
+            Map<String, ClassOfferingMeta> metaMap
+    ) {
+        return assignments.stream()
+                .map(ExamAssignment::getClassOfferingId)
+                .filter(Objects::nonNull)
+                .map(metaMap::get)
+                .filter(Objects::nonNull)
+                .map(ClassOfferingMeta::academicYear)
+                .filter(Objects::nonNull)
+                .filter(s -> !s.isBlank())
+                .findFirst()
+                .orElse("");
+    }
+
+    private void validateReviewerRole(String role) {
+        if (!"FACULTY".equalsIgnoreCase(role)
+                && !"ADMIN".equalsIgnoreCase(role)) {
+            throw new RuntimeException("Only faculty or admin can review answers.");
+        }
+    }
+
+    private OffsetDateTime nowManila() {
+        return OffsetDateTime.now(MANILA_ZONE);
+    }
+    private OffsetDateTime toManila(OffsetDateTime value) {
+        if (value == null) {
+            return null;
         }
 
-        if (Boolean.TRUE.equals(exam.getShuffleQuestions())) {
-            Collections.shuffle(normalQuestions);
-            Collections.shuffle(essayQuestions);
-        }
-
-        List<ExamQuestion> finalQuestions = new ArrayList<>();
-        finalQuestions.addAll(normalQuestions);
-        finalQuestions.addAll(essayQuestions);
-
-        List<Long> finalQuestionIds = finalQuestions.stream()
-                .map(ExamQuestion::getQuestionId)
-                .toList();
-
-        ExamAttempt attempt = new ExamAttempt();
-        attempt.setExamId(exam.getExamId());
-        attempt.setStudentId(username);
-        attempt.setStatus(ExamAttemptStatus.IN_PROGRESS);
-        attempt.setStartedAt(OffsetDateTime.now(ZoneOffset.UTC));
-        attempt.setQuestionOrder(toJsonList(finalQuestionIds));
-
-        attempt = attemptRepository.save(attempt);
-
-        List<ExamAttemptChoiceOrder> choiceOrdersToSave = new ArrayList<>();
-
-        for (ExamQuestion question : finalQuestions) {
-            List<ExamChoice> choices = new ArrayList<>(
-                    choiceMap.getOrDefault(
-                            question.getQuestionId(),
-                            new ArrayList<>()
-                    )
-            );
-
-            List<ExamChoice> normalChoices = new ArrayList<>();
-            List<ExamChoice> noneOfTheAboveChoices = new ArrayList<>();
-
-            for (ExamChoice choice : choices) {
-                String text = choice.getChoiceText();
-
-                if (text != null && text.trim().equalsIgnoreCase("None of the above")) {
-                    noneOfTheAboveChoices.add(choice);
-                } else {
-                    normalChoices.add(choice);
-                }
-            }
-
-            if (Boolean.TRUE.equals(exam.getShuffleChoices())) {
-                Collections.shuffle(normalChoices);
-            }
-
-            List<ExamChoice> finalChoices = new ArrayList<>();
-            finalChoices.addAll(normalChoices);
-            finalChoices.addAll(noneOfTheAboveChoices);
-
-            List<Long> finalChoiceIds = finalChoices.stream()
-                    .map(ExamChoice::getChoiceId)
-                    .toList();
-
-            ExamAttemptChoiceOrder order = new ExamAttemptChoiceOrder();
-            order.setAttemptId(attempt.getAttemptId());
-            order.setQuestionId(question.getQuestionId());
-            order.setChoiceOrder(toJsonList(finalChoiceIds));
-
-            choiceOrdersToSave.add(order);
-        }
-
-        attemptChoiceOrderRepository.saveAll(choiceOrdersToSave);
-
-        return attempt;
+        return value
+                .atZoneSameInstant(MANILA_ZONE)
+                .toOffsetDateTime();
     }
 
     private String toJsonList(List<Long> ids) {
@@ -2131,15 +2411,6 @@ public class ExamService {
         exam.setExamMode(ExamMode.valueOf(request.getExamMode().trim().toUpperCase()));
     }
 
-    private void deleteExamChildren(Long examId) {
-        questionViolationOverrideRepository.deleteByQuestionExamExamId(examId);
-        choiceRepository.deleteByQuestionExamExamId(examId);
-        essayRubricRepository.deleteByQuestionExamExamId(examId);
-        examViolationSettingRepository.deleteByExamExamId(examId);
-        questionRepository.deleteByExamExamId(examId);
-        assignmentRepository.deleteByExamExamId(examId);
-    }
-
     private void saveAssignments(
             Exam exam,
             List<String> classOfferingIds,
@@ -2164,6 +2435,49 @@ public class ExamService {
             assignment.setStatus(status);
 
             assignmentRepository.save(assignment);
+        }
+    }
+
+    private void syncAssignments(
+            Exam exam,
+            List<String> newClassOfferingIds,
+            String assignedBy,
+            ExamStatus status
+    ) {
+        List<ExamAssignment> existingAssignments =
+                assignmentRepository.findByExamExamId(exam.getExamId());
+
+        Set<String> existingIds = existingAssignments.stream()
+                .map(ExamAssignment::getClassOfferingId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        Set<String> newIds = newClassOfferingIds == null
+                ? Set.of()
+                : new HashSet<>(newClassOfferingIds);
+
+        for (ExamAssignment existing : existingAssignments) {
+            if (!newIds.contains(existing.getClassOfferingId())) {
+                assignmentRepository.delete(existing);
+            }
+        }
+
+        List<ExamAssignment> toAdd = new ArrayList<>();
+
+        for (String classOfferingId : newIds) {
+            if (!existingIds.contains(classOfferingId)) {
+                ExamAssignment assignment = new ExamAssignment();
+                assignment.setExam(exam);
+                assignment.setClassOfferingId(classOfferingId);
+                assignment.setAssignedBy(assignedBy);
+                assignment.setStatus(status);
+
+                toAdd.add(assignment);
+            }
+        }
+
+        if (!toAdd.isEmpty()) {
+            assignmentRepository.saveAll(toAdd);
         }
     }
 
@@ -2214,6 +2528,206 @@ public class ExamService {
         if (!rubricEntities.isEmpty()) { essayRubricRepository.saveAll(rubricEntities); }
 
 
+    }
+
+    @Transactional
+    private void syncQuestions(
+            Exam exam,
+            List<QuestionRequest> requests
+    ) {
+
+        List<ExamQuestion> existingQuestions =
+                questionRepository.findByExamExamIdOrderByQuestionOrderAsc(
+                        exam.getExamId()
+                );
+
+        Map<Long, ExamQuestion> existingMap =
+                existingQuestions.stream()
+                        .collect(Collectors.toMap(
+                                ExamQuestion::getQuestionId,
+                                q -> q
+                        ));
+
+        Set<Long> incomingIds = requests.stream()
+                .map(QuestionRequest::getQuestionId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        // DELETE REMOVED QUESTIONS
+        for (ExamQuestion existing : existingQuestions) {
+
+            if (!incomingIds.contains(existing.getQuestionId())) {
+
+                boolean hasAttempts =
+                        answerRepository.existsByQuestionQuestionId( existing.getQuestionId() );
+
+                if (hasAttempts) {
+                    throw new RuntimeException(
+                            "Cannot delete question with student attempts."
+                    );
+                }
+
+                questionRepository.delete(existing);
+            }
+        }
+
+        int order = 1;
+
+        for (QuestionRequest request : requests) {
+
+            ExamQuestion question;
+
+            // UPDATE EXISTING
+            if (request.getQuestionId() != null
+                    && existingMap.containsKey(request.getQuestionId())) {
+
+                question = existingMap.get(request.getQuestionId());
+
+            }
+
+            // CREATE NEW
+            else {
+
+                question = new ExamQuestion();
+                question.setExam(exam);
+            }
+
+            question.setQuestionType(
+                    QuestionType.valueOf(request.getQuestionType())
+            );
+
+            question.setQuestionText(request.getQuestionText());
+            question.setQuestionImageUrl(request.getQuestionImageUrl());
+            question.setPoints(request.getPoints());
+            question.setCorrectAnswer(request.getCorrectAnswer());
+            question.setQuestionInstruction(request.getQuestionInstruction());
+            question.setQuestionOrder(order++);
+
+            question = questionRepository.save(question);
+
+            syncChoices(question, request.getChoices());
+
+            syncRubrics(question, request.getRubrics());
+        }
+    }
+
+    private void syncChoices(
+            ExamQuestion question,
+            List<ChoiceRequest> requests
+    ) {
+
+        if (requests == null) {
+            requests = List.of();
+        }
+
+        List<ExamChoice> existingChoices =
+                choiceRepository
+                        .findByQuestionQuestionIdOrderByChoiceOrderAsc(
+                                question.getQuestionId()
+                        );
+
+        Map<Long, ExamChoice> existingMap =
+                existingChoices.stream()
+                        .collect(Collectors.toMap(
+                                ExamChoice::getChoiceId,
+                                c -> c
+                        ));
+
+        Set<Long> incomingIds = requests.stream()
+                .map(ChoiceRequest::getChoiceId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        for (ExamChoice existing : existingChoices) {
+
+            if (!incomingIds.contains(existing.getChoiceId())) {
+
+                choiceRepository.delete(existing);
+            }
+        }
+
+        int order = 1;
+
+        for (ChoiceRequest request : requests) {
+
+            ExamChoice choice;
+
+            if (request.getChoiceId() != null
+                    && existingMap.containsKey(request.getChoiceId())) {
+
+                choice = existingMap.get(request.getChoiceId());
+
+            } else {
+
+                choice = new ExamChoice();
+                choice.setQuestion(question);
+            }
+
+            choice.setChoiceLabel(request.getChoiceLabel());
+            choice.setChoiceText(request.getChoiceText());
+            choice.setChoiceImageUrl(request.getChoiceImageUrl());
+            choice.setCorrect(request.getCorrect());
+            choice.setChoiceOrder(order++);
+
+            choiceRepository.save(choice);
+        }
+    }
+
+    private void syncRubrics(
+            ExamQuestion question,
+            List<EssayRubricRequest> requests
+    ) {
+
+        List<EssayRubric> existingRubrics =
+                essayRubricRepository
+                        .findByQuestionQuestionIdOrderByDisplayOrderAsc(
+                                question.getQuestionId()
+                        );
+
+        Map<Long, EssayRubric> existingMap =
+                existingRubrics.stream()
+                        .collect(Collectors.toMap(
+                                EssayRubric::getRubricId,
+                                r -> r
+                        ));
+
+        Set<Long> incomingIds = requests.stream()
+                .map(EssayRubricRequest::getRubricId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        for (EssayRubric existing : existingRubrics) {
+
+            if (!incomingIds.contains(existing.getRubricId())) {
+
+                essayRubricRepository.delete(existing);
+            }
+        }
+
+        int order = 1;
+
+        for (EssayRubricRequest request : requests) {
+
+            EssayRubric rubric;
+
+            if (request.getRubricId() != null
+                    && existingMap.containsKey(request.getRubricId())) {
+
+                rubric = existingMap.get(request.getRubricId());
+
+            } else {
+
+                rubric = new EssayRubric();
+                rubric.setQuestion(question);
+            }
+
+            rubric.setCriterionName(request.getCriterionName());
+            rubric.setWeightPercentage(request.getWeightPercentage());
+            rubric.setDescription(request.getDescription());
+            rubric.setDisplayOrder(order++);
+
+            essayRubricRepository.save(rubric);
+        }
     }
 
     private static @NonNull List<ExamChoice> getExamChoices(List<QuestionRequest> questions, List<ExamQuestion> savedQuestions) {
@@ -2282,105 +2796,58 @@ public class ExamService {
         return rubricEntities;
     }
 
-    @Transactional
-    public SimpleMessageResponse applyViolationDecision(
-            ViolationDecisionRequest request,
-            String employeeId,
-            String role
-    ) {
-        validateRole(role);
-
-        ExamAnswer answer = answerRepository.findById(request.getAnswerId())
-                .orElseThrow(() -> new RuntimeException("Answer not found."));
-
-        BigDecimal currentScore = answer.getPointsAwarded() == null
-                ? BigDecimal.ZERO
-                : answer.getPointsAwarded();
-
-        BigDecimal deduction = request.getDeduction() == null
-                ? BigDecimal.ZERO
-                : request.getDeduction();
-
-        if (deduction.compareTo(BigDecimal.ZERO) < 0) {
-            throw new RuntimeException("Deduction cannot be negative.");
-        }
-
-        if (deduction.compareTo(currentScore) > 0) {
-            throw new RuntimeException("Deduction cannot be greater than current score.");
-        }
-
-        String decision = request.getDecision() == null
-                ? "IGNORED"
-                : request.getDecision().trim().toUpperCase();
-
-        if (!decision.equals("IGNORED") && !decision.equals("PENALIZED")) {
-            throw new RuntimeException("Invalid violation decision.");
-        }
-
-        if (decision.equals("PENALIZED")) {
-            answer.setPointsAwarded(currentScore.subtract(deduction));
-        }
-
-        String existingFeedback = answer.getFacultyFeedback();
-
-        String newFeedbackBlock =
-                "\n\n[Violation Decision]\n" +
-                        "Decision: " + decision + "\n" +
-                        "Deduction: " + deduction + "\n" +
-                        "Notes: " + safeText(request.getFeedback());
-
-        answer.setFacultyFeedback(
-                existingFeedback == null || existingFeedback.isBlank()
-                        ? newFeedbackBlock.trim()
-                        : existingFeedback.trim() + newFeedbackBlock
-        );
-
-        answer.setManuallyReviewed(true);
-        answer.setNeedsChecking(false);
-        answer.setReviewStatus("REVIEWED");
-
-        answerRepository.save(answer);
-
-        violationLogRepository.markQuestionViolationsReviewed(
-                request.getAttemptId(),
-                request.getQuestionId(),
-                decision,
-                employeeId,
-                OffsetDateTime.now()
-        );
-
-        return new SimpleMessageResponse(true, "Violation decision saved.");
-    }
-
-    private String safeText(String value) {
-        return value == null || value.isBlank()
-                ? "No notes provided."
-                : value.trim();
-    }
-
-
-    // ===============
-    // HELPERS
-    // ===============
-
     private boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
     }
 
-    private String determineStatus(Exam exam, List<ExamAssignment> assignments) {
-        return examStatusService.getDisplayStatus(exam).name();
+    private String determineStatus(
+            Exam exam,
+            List<ExamAssignment> assignments
+    ) {
+        if (exam == null) {
+            return "DRAFT";
+        }
+
+        List<String> classOfferingIds =
+                assignments == null
+                        ? List.of()
+                        : assignments.stream()
+                        .map(ExamAssignment::getClassOfferingId)
+                        .filter(Objects::nonNull)
+                        .distinct()
+                        .toList();
+
+        int totalAssignedStudents = classOfferingIds.isEmpty()
+                ? 0
+                : classEnrollmentCacheRepository
+                .countDistinctEnrolledStudentsByClassOfferingIds(classOfferingIds);
+
+        int submittedStudents =
+                attemptRepository.countFinishedAttemptsByExamId(
+                        exam.getExamId()
+                );
+
+        return examStatusService.getDisplayStatus(
+                exam,
+                totalAssignedStudents,
+                submittedStudents
+        ).name();
     }
 
     private String formatAssignedTo(
             List<ExamAssignment> assignments,
-            Map<String, String> classOfferingDisplayMap
+            Map<String, ClassOfferingMeta> metaMap
     ) {
         if (assignments == null || assignments.isEmpty()) {
-            return "Not assigned";
+            return "Unassigned";
         }
 
         return assignments.stream()
-                .map(a -> classOfferingDisplayMap.getOrDefault(a.getClassOfferingId(), "Unknown"))
+                .map(ExamAssignment::getClassOfferingId)
+                .filter(Objects::nonNull)
+                .map(metaMap::get)
+                .filter(Objects::nonNull)
+                .map(ClassOfferingMeta::displayName)
                 .distinct()
                 .collect(Collectors.joining(", "));
     }

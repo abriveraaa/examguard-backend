@@ -2,6 +2,9 @@ package com.example.backend.controller;
 
 import com.example.backend.dto.faculty.*;
 import com.example.backend.dto.faculty.response.FacultyDashboardResponse;
+import com.example.backend.entity.core.UserAccess;
+import com.example.backend.service.auth.AuthService;
+import com.example.backend.service.exam.ExamService;
 import com.example.backend.service.faculty.FacultyService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -13,78 +16,80 @@ import java.util.List;
 public class FacultyController {
 
     private final FacultyService facultyService;
+    private final AuthService authService;
 
-    public FacultyController(FacultyService facultyService) {
+    public FacultyController(FacultyService facultyService,
+                             AuthService authService) {
         this.facultyService = facultyService;
+        this.authService = authService;
     }
 
     @GetMapping("/dashboard")
     public ResponseEntity<FacultyDashboardResponse> getFacultyDashboard(
-            @RequestHeader("X-User-Id") String employeeId,
-            @RequestHeader("X-Role") String role
+            @RequestHeader("Authorization") String authorization
     ) {
-        return ResponseEntity.ok(
-                facultyService.getFacultyDashboard(employeeId, role)
-        );
+        UserAccess user = authService.getUserFromSession(authorization);
+
+        return ResponseEntity.ok(facultyService.getFacultyDashboard(user.getSchoolId(), user.getRole()));
     }
 
     @GetMapping("/dashboard/profile")
     public ResponseEntity<FacultyProfileDTO> getDashboardProfile(
-            @RequestHeader("X-User-Id") String employeeId,
-            @RequestHeader("X-Role") String role
+            @RequestHeader("Authorization") String authorization
     ) {
+        UserAccess user = authService.getUserFromSession(authorization);
+
         return ResponseEntity.ok(
-                facultyService.getDashboardProfile(employeeId, role)
-        );
+                facultyService.getDashboardProfile(user.getSchoolId(), user.getRole()));
     }
 
     @GetMapping("/dashboard/stats")
     public ResponseEntity<FacultyDashboardStatsDTO> getDashboardStats(
-            @RequestHeader("X-User-Id") String employeeId,
-            @RequestHeader("X-Role") String role
+            @RequestHeader("Authorization") String authorization
     ) {
+        UserAccess user = authService.getUserFromSession(authorization);
+
         return ResponseEntity.ok(
-                facultyService.getDashboardStats(employeeId, role)
-        );
+                facultyService.getDashboardStats(user.getSchoolId(), user.getRole()));
     }
 
     @GetMapping("/dashboard/active-exams")
     public ResponseEntity<List<FacultyExamSummaryDTO>> getDashboardActiveExams(
-            @RequestHeader("X-User-Id") String employeeId,
-            @RequestHeader("X-Role") String role
+            @RequestHeader("Authorization") String authorization
     ) {
+        UserAccess user = authService.getUserFromSession(authorization);
+
         return ResponseEntity.ok(
-                facultyService.getDashboardActiveExams(employeeId, role)
-        );
+                facultyService.getDashboardActiveExams(user.getSchoolId(), user.getRole()));
     }
 
     @GetMapping("/dashboard/recent-submissions")
     public ResponseEntity<List<FacultySubmissionSummaryDTO>> getRecentSubmissions(
-            @RequestHeader("X-User-Id") String employeeId,
-            @RequestHeader("X-Role") String role
+            @RequestHeader("Authorization") String authorization
     ) {
+        UserAccess user = authService.getUserFromSession(authorization);
+
         return ResponseEntity.ok(
-                facultyService.getDashboardRecentSubmissions(employeeId, role)
-        );
+                facultyService.getDashboardRecentSubmissions(user.getSchoolId(), user.getRole()));
     }
 
     @GetMapping("/dashboard/needs-review")
     public ResponseEntity<List<FacultyViolationReviewDTO>> getNeedsReview(
-            @RequestHeader("X-User-Id") String employeeId,
-            @RequestHeader("X-Role") String role
+            @RequestHeader("Authorization") String authorization
     ) {
+        UserAccess user = authService.getUserFromSession(authorization);
+
         return ResponseEntity.ok(
-                facultyService.getDashboardNeedsReview(employeeId, role)
-        );
+                facultyService.getDashboardNeedsReview(user.getSchoolId(), user.getRole()));
     }
 
     @GetMapping("/dashboard/classes")
     public ResponseEntity<List<FacultyClassDTO>> getFacultyClasses(
-            @RequestHeader("X-User-Id") String employeeId,
-            @RequestHeader("X-Role") String role
+            @RequestHeader("Authorization") String authorization
     ) {
+        UserAccess user = authService.getUserFromSession(authorization);
+
         return ResponseEntity.ok(
-                facultyService.getFacultyClasses(employeeId, role)
-        );
+                facultyService.getFacultyClasses(user.getSchoolId(), user.getRole()));
     }
 }
