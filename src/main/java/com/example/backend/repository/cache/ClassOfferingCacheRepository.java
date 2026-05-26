@@ -10,9 +10,14 @@ import java.util.Optional;
 
 public interface ClassOfferingCacheRepository extends JpaRepository<ClassOfferingCache, String> {
 
-    List<ClassOfferingCache> findByAcademicYearAndTerm(String academicYear, String term);
-
     List<ClassOfferingCache> findByClassOfferingIdIn(List<String> classOfferingIds);
+
+    @Query("""
+            SELECT c
+            FROM ClassOfferingCache c
+            WHERE c.status = 'ACTIVE'
+        """)
+    List<ClassOfferingCache> findAllActive();
 
     @Query("""
             SELECT new com.example.backend.dto.core.CurrentTermDTO(

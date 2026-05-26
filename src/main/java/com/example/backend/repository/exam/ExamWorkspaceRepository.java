@@ -557,73 +557,116 @@ GROUP BY
     );
 
     @Query("""
-    SELECT new com.example.backend.dto.faculty.FacultyActivityLogDTO(
-        'ACTIVITY',
-        log.logId,
-        log.examId,
-        log.attemptId,
-        log.questionId,
-        question.questionOrder,
-        COALESCE(log.targetUserId, attempt.studentId),
-        CONCAT(
-            COALESCE(student.firstName, ''),
-            ' ',
-            COALESCE(student.lastName, '')
-        ),
-        log.module,
-        log.action,
-        null,
-        log.message,
-        null,
-        log.durationMs,
-        log.occurredAt
-    )
-    FROM SystemActivityLog log
-    LEFT JOIN ExamAttempt attempt
-        ON attempt.attemptId = log.attemptId
-    LEFT JOIN ExamQuestion question
-        ON question.questionId = log.questionId
-    LEFT JOIN StudentProfileCache student
-        ON student.studentId = COALESCE(log.targetUserId, attempt.studentId)
-    WHERE log.examId = :examId
-    ORDER BY log.occurredAt ASC
-""")
+        SELECT new com.example.backend.dto.faculty.FacultyActivityLogDTO(
+            'ACTIVITY',
+            log.logId,
+            log.examId,
+            log.attemptId,
+            log.questionId,
+            question.questionOrder,
+        
+            COALESCE(log.targetUserId, attempt.studentId),
+        
+            CONCAT(
+                COALESCE(student.firstName,''),
+                ' ',
+                COALESCE(student.lastName,'')
+            ),
+        
+            log.actorId,
+        
+            CASE
+                WHEN admin.employeeId IS NOT NULL
+                    THEN CONCAT(
+                        admin.firstName,
+                        ' ',
+                        admin.lastName,
+                        ' (Admin)'
+                    )
+        
+                WHEN faculty.employeeId IS NOT NULL
+                    THEN CONCAT(
+                        faculty.firstName,
+                        ' ',
+                        faculty.lastName,
+                        ' (Faculty)'
+                    )
+        
+                ELSE log.actorId
+            END,
+        
+            log.module,
+            log.action,
+            null,
+            log.message,
+            null,
+            log.durationMs,
+            log.occurredAt
+        )
+        FROM SystemActivityLog log
+        
+        LEFT JOIN ExamAttempt attempt
+            ON attempt.attemptId = log.attemptId
+        
+        LEFT JOIN ExamQuestion question
+            ON question.questionId = log.questionId
+        
+        LEFT JOIN StudentProfileCache student
+            ON student.studentId =
+               COALESCE(log.targetUserId, attempt.studentId)
+        
+        LEFT JOIN AdminProfile admin
+            ON admin.employeeId = log.actorId
+        
+        LEFT JOIN FacultyProfileCache faculty
+            ON faculty.employeeId = log.actorId
+        
+        WHERE log.examId = :examId
+        ORDER BY log.occurredAt ASC
+        """)
     List<FacultyActivityLogDTO> findSystemActivityLogsByExamId(
             @Param("examId") Long examId
     );
 
     @Query("""
-    SELECT new com.example.backend.dto.faculty.FacultyActivityLogDTO(
-        'VIOLATION',
-        violation.violationId,
-        violation.exam.examId,
-        attempt.attemptId,
-        question.questionId,
-        question.questionOrder,
-
-        attempt.studentId,
-        CONCAT(
-            COALESCE(student.firstName, ''),
-            ' ',
-            COALESCE(student.lastName, '')
-        ),
-
-        'PROCTORING',
-        violation.violationType,
-        violation.severity,
-        violation.violationMessage,
-        violation.evidenceUrl,
-        null,
-        violation.occurredAt
-    )
-    FROM ExamViolationLog violation
-    JOIN violation.attempt attempt
-    LEFT JOIN violation.question question
-    LEFT JOIN StudentProfileCache student
-        ON student.studentId = attempt.studentId
-    WHERE violation.exam.examId = :examId
-    ORDER BY violation.occurredAt ASC
-""")
+        SELECT new com.example.backend.dto.faculty.FacultyActivityLogDTO(
+            'VIOLATION',
+            violation.violationId,
+            violation.exam.examId,
+            attempt.attemptId,
+            question.questionId,
+            question.questionOrder,
+        
+            attempt.studentId,
+            TRIM(CONCAT(
+                COALESCE(student.firstName, ''),
+                ' ',
+                COALESCE(student.lastName, '')
+            )),
+        
+            attempt.studentId,
+            TRIM(CONCAT(
+                COALESCE(student.firstName, ''),
+                ' ',
+                COALESCE(student.lastName, '')
+            )),
+        
+            'PROCTORING',
+            violation.violationType,
+            violation.severity,
+            violation.violationMessage,
+            violation.evidenceUrl,
+            null,
+            violation.occurredAt
+        )
+        FROM ExamViolationLog violation
+        JOIN violation.attempt attempt
+        LEFT JOIN violation.question question
+        LEFT JOIN StudentProfileCache student
+            ON student.studentId = attempt.studentId
+        WHERE violation.exam.examId = :examId
+        ORDER BY violation.occurredAt ASC
+        """)
     List<FacultyActivityLogDTO> findViolationActivityLogsByExamId(
             @Param("examId") Long examId
     );

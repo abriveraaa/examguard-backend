@@ -1,8 +1,8 @@
 package com.example.backend.dto.faculty.reports;
 
-public record ViolationTypeDTO(
+public record ExamSubmissionBreakdownDTO(
         Long examId,
         String examTitle,
-        String violationType,
+        String status,
         Long count
 ) {}

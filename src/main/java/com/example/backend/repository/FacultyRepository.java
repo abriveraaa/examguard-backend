@@ -43,7 +43,7 @@ public interface FacultyRepository extends Repository<Exam, Long> {
         SELECT DISTINCT fl.classOfferingId
         FROM FacultyLoadCache fl
         WHERE fl.employeeId = :employeeId
-    )
+    ) AND co.status = 'ACTIVE'
     GROUP BY
         co.classOfferingId,
         co.courseCode,

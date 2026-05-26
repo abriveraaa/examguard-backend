@@ -29,7 +29,7 @@ public class StudentRosterExportService {
             ByteArrayOutputStream outputStream =
                     new ByteArrayOutputStream();
 
-            Document document = ReportPdfUtil.createDocument(outputStream, ReportConfig.landscape(collegeOffering, generatedByText));
+            Document document = ReportPdfUtil.createDocument(outputStream, ReportConfig.portrait(collegeOffering, generatedByText));
 
             addTitle(document);
             addRosterTable(document, students);

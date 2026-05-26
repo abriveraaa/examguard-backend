@@ -1,10 +1,14 @@
 package com.example.backend.entity.core;
 
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.time.OffsetDateTime;
 
 @Entity
+@Getter
+@Setter
 @Table(name = "user_access")
 public class UserAccess {
 
@@ -52,6 +56,9 @@ public class UserAccess {
     @Column(name = "last_login_at")
     private OffsetDateTime lastLoginAt;
 
+    @Column(name = "profile_image_url")
+    private String profileImageUrl;
+
     @Column(name = "created_at", insertable = false, updatable = false)
     private OffsetDateTime createdAt;
 
@@ -68,127 +75,5 @@ public class UserAccess {
     private Boolean eligibleForReactivation = false;
 
     public UserAccess() {
-    }
-
-    public Long getAccessId() {
-        return accessId;
-    }
-
-    public String getSchoolId() {
-        return schoolId;
-    }
-
-    public void setSchoolId(String schoolId) {
-        this.schoolId = schoolId;
-    }
-
-    public String getUsername() {
-        return username;
-    }
-
-    public void setUsername(String username) {
-        this.username = username;
-    }
-
-    public String getEmail() { return email; }
-
-    public void setEmail(String email) {
-        this.email = email;
-    }
-
-    public String getPasswordHash() { return passwordHash; }
-
-    public void setPasswordHash(String passwordHash) {
-        this.passwordHash = passwordHash;
-    }
-
-    public String getRole() {
-        return role;
-    }
-
-    public void setRole(String role) {
-        this.role = role;
-    }
-
-    public boolean isActive() {
-        return isActive;
-    }
-
-    public void setActive(boolean active) {
-        isActive = active;
-    }
-
-    public boolean isBlocked() {
-        return isBlocked;
-    }
-
-    public void setBlocked(boolean blocked) {
-        isBlocked = blocked;
-    }
-
-    public boolean isMustChangePassword() {
-        return mustChangePassword;
-    }
-
-    public void setMustChangePassword(boolean mustChangePassword) { this.mustChangePassword = mustChangePassword; }
-
-    public int getFailedLoginAttempts() {
-        return failedLoginAttempts;
-    }
-
-    public void setFailedLoginAttempts(int failedLoginAttempts) {
-        this.failedLoginAttempts = failedLoginAttempts;
-    }
-
-    public OffsetDateTime getActivatedAt() {
-        return activatedAt;
-    }
-
-    public void setActivatedAt(OffsetDateTime activatedAt) {
-        this.activatedAt = activatedAt;
-    }
-
-    public OffsetDateTime getBlockedAt() {
-        return blockedAt;
-    }
-
-    public void setBlockedAt(OffsetDateTime blockedAt) {
-        this.blockedAt = blockedAt;
-    }
-
-    public OffsetDateTime getTempPasswordSentAt() {
-        return tempPasswordSentAt;
-    }
-
-    public void setTempPasswordSentAt(OffsetDateTime tempPasswordSentAt) {
-        this.tempPasswordSentAt = tempPasswordSentAt;
-    }
-
-    public OffsetDateTime getLastLoginAt() {
-        return lastLoginAt;
-    }
-
-    public void setLastLoginAt(OffsetDateTime lastLoginAt) {
-        this.lastLoginAt = lastLoginAt;
-    }
-
-    public OffsetDateTime getTempPasswordExpiry() { return tempPasswordExpiry; }
-
-    public void setTempPasswordExpiry(OffsetDateTime tempPasswordExpiry) { this.tempPasswordExpiry = tempPasswordExpiry; }
-
-    public String getDeactivationReason() {
-        return deactivationReason;
-    }
-
-    public void setDeactivationReason(String deactivationReason) {
-        this.deactivationReason = deactivationReason;
-    }
-
-    public Boolean getEligibleForReactivation() {
-        return eligibleForReactivation;
-    }
-
-    public void setEligibleForReactivation(Boolean eligibleForReactivation) {
-        this.eligibleForReactivation = eligibleForReactivation;
     }
 }

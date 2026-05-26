@@ -3,6 +3,7 @@ package com.example.backend.repository.cache;
 import com.example.backend.dto.faculty.students.FacultyAcademicPeriodDTO;
 import com.example.backend.dto.faculty.students.FacultyCourseDTO;
 import com.example.backend.dto.faculty.students.FacultySectionDTO;
+import com.example.backend.entity.cache.ClassOfferingCache;
 import com.example.backend.entity.cache.FacultyLoadCache;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -21,6 +22,18 @@ public interface FacultyLoadCacheRepository extends JpaRepository<FacultyLoadCac
     boolean existsByEmployeeIdAndClassOfferingId(
             String employeeId,
             String classOfferingId
+    );
+
+    @Query("""
+            SELECT co
+            FROM FacultyLoadCache fl
+            JOIN ClassOfferingCache co
+                ON co.classOfferingId = fl.classOfferingId
+            WHERE fl.employeeId = :employeeId
+              AND co.status='ACTIVE'
+        """)
+    List<ClassOfferingCache> findActiveOfferingsByEmployeeId(
+            @Param("employeeId") String employeeId
     );
 
     @Query("""

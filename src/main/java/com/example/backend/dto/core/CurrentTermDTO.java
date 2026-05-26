@@ -8,7 +8,6 @@ public class CurrentTermDTO {
     private String term;
 
     public CurrentTermDTO(String academicYear, String term) {
-
         this.academicYear = academicYear;
         this.term = term;
     }

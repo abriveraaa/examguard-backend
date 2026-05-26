@@ -81,8 +81,7 @@ public class ReportExportService {
                 .generatedByText(generatedByText)
                 .build();
 
-        PdfReportExporter exporter =
-                factory.getExporter(request.getReportType().name());
+        PdfReportExporter exporter = factory.getExporter(request.getReportType().name());
 
         return exporter.export(request);
     }

@@ -1,20 +1,22 @@
 package com.example.backend.dto.faculty;
 
+import lombok.Getter;
+
 import java.time.OffsetDateTime;
 
+@Getter
 public class FacultyActivityLogDTO {
 
-    private String logType; // ACTIVITY or VIOLATION
-
+    private String logType;
     private Long logId;
     private Long examId;
     private Long attemptId;
     private Long questionId;
     private Integer questionNumber;
-
     private String studentId;
     private String studentName;
-
+    private String actorId;
+    private String actorName;
     private String module;
     private String action;
     private String severity;
@@ -33,6 +35,8 @@ public class FacultyActivityLogDTO {
             Integer questionNumber,
             String studentId,
             String studentName,
+            String actorId,
+            String actorName,
             String module,
             String action,
             String severity,
@@ -49,6 +53,8 @@ public class FacultyActivityLogDTO {
         this.questionNumber = questionNumber;
         this.studentId = studentId;
         this.studentName = studentName;
+        this.actorId = actorId;
+        this.actorName = actorName;
         this.module = module;
         this.action = action;
         this.severity = severity;
@@ -57,20 +63,4 @@ public class FacultyActivityLogDTO {
         this.durationMs = durationMs;
         this.occurredAt = occurredAt;
     }
-
-    public String getLogType() { return logType; }
-    public Long getLogId() { return logId; }
-    public Long getExamId() { return examId; }
-    public Long getAttemptId() { return attemptId; }
-    public Long getQuestionId() { return questionId; }
-    public Integer getQuestionNumber() { return questionNumber; }
-    public String getStudentId() { return studentId; }
-    public String getStudentName() { return studentName; }
-    public String getModule() { return module; }
-    public String getAction() { return action; }
-    public String getSeverity() { return severity; }
-    public String getMessage() { return message; }
-    public String getEvidenceUrl() { return evidenceUrl; }
-    public Long getDurationMs() { return durationMs; }
-    public OffsetDateTime getOccurredAt() { return occurredAt; }
 }

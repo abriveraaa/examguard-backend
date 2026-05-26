@@ -47,9 +47,11 @@ public interface StudentProfileCacheRepository extends JpaRepository<StudentProf
 
         co.courseCode,
         co.courseDescription,
-        co.classOfferingId
+        co.classOfferingId,
+        ua.profileImageUrl
     )
     FROM StudentProfileCache s
+    JOIN UserAccess ua ON ua.schoolId = s.studentId
     JOIN ClassEnrollmentCache ce
         ON ce.studentId = s.studentId
     JOIN ClassOfferingCache co
@@ -78,9 +80,11 @@ public interface StudentProfileCacheRepository extends JpaRepository<StudentProf
 
         co.courseCode,
         co.courseDescription,
-        co.classOfferingId
+        co.classOfferingId,
+        ua.profileImageUrl
     )
     FROM StudentProfileCache s
+    JOIN UserAccess ua ON ua.schoolId = s.studentId
     JOIN ClassEnrollmentCache ce
         ON ce.studentId = s.studentId
     JOIN FacultyLoadCache fl
@@ -116,9 +120,11 @@ public interface StudentProfileCacheRepository extends JpaRepository<StudentProf
         
             co.courseCode,
             co.courseDescription,
-            CAST(co.classOfferingId AS string)
+            CAST(co.classOfferingId AS string),
+            ua.profileImageUrl
         )
         FROM StudentProfileCache sp
+        JOIN UserAccess ua ON ua.schoolId = sp.studentId
         JOIN ClassEnrollmentCache ce
         ON ce.studentId = sp.studentId
         JOIN ClassOfferingCache co
@@ -154,9 +160,11 @@ public interface StudentProfileCacheRepository extends JpaRepository<StudentProf
         
             co.courseCode,
             co.courseDescription,
-            CAST(co.classOfferingId AS string)
+            CAST(co.classOfferingId AS string),
+            ua.profileImageUrl
         )
         FROM StudentProfileCache sp
+        JOIN UserAccess ua ON ua.schoolId = sp.studentId
         JOIN ClassEnrollmentCache ce
         ON ce.studentId = sp.studentId
         JOIN ClassOfferingCache co
@@ -188,9 +196,11 @@ public interface StudentProfileCacheRepository extends JpaRepository<StudentProf
         
             co.courseCode,
             co.courseDescription,
-            CAST(co.classOfferingId AS string)
+            CAST(co.classOfferingId AS string),
+            ua.profileImageUrl
         )
         FROM StudentProfileCache sp
+        JOIN UserAccess ua ON ua.schoolId = sp.studentId
         JOIN ClassEnrollmentCache ce
         ON ce.studentId = sp.studentId
         JOIN ClassOfferingCache co
@@ -230,9 +240,11 @@ public interface StudentProfileCacheRepository extends JpaRepository<StudentProf
         
             co.courseCode,
             co.courseDescription,
-            CAST(co.classOfferingId AS string)
+            CAST(co.classOfferingId AS string),
+            ua.profileImageUrl
         )
         FROM StudentProfileCache sp
+        JOIN UserAccess ua ON ua.schoolId = sp.studentId
         JOIN ClassEnrollmentCache ce
         ON ce.studentId = sp.studentId
         JOIN ClassOfferingCache co

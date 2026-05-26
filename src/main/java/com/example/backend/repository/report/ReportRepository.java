@@ -578,4 +578,112 @@ public interface ReportRepository extends Repository<Exam, Long> {
             @Param("examId") Long examId,
             @Param("classOfferingId") String classOfferingId
     );
+
+
+    // ======================
+    // REPORT - CLASS RECORDS
+    // ======================
+
+    @Query(value = """
+        SELECT
+            e.exam_id AS examId,
+            e.title AS examTitle,
+            COALESCE(SUM(eq.points), 0) AS totalPoints,
+            e.start_datetime AS startDateTime,
+            e.end_datetime AS endDateTime
+        FROM exam e
+        JOIN exam_assignment ea
+            ON ea.exam_id = e.exam_id
+        JOIN class_offering_cache co
+            ON co.class_offering_id = ea.class_offering_id
+        LEFT JOIN exam_question eq
+            ON eq.exam_id = e.exam_id
+        WHERE co.course_code = :courseCode
+          AND co.academic_year = :academicYear
+          AND co.term = :term
+          AND co.section_name IN (:sectionNames)
+          AND e.published = true
+        GROUP BY
+            e.exam_id,
+            e.title,
+            e.start_datetime,
+            e.end_datetime
+        ORDER BY e.start_datetime ASC
+        """, nativeQuery = true)
+    List<Object[]> findClassRecordExamColumns(
+            @Param("academicYear") String academicYear,
+            @Param("term") String term,
+            @Param("courseCode") String courseCode,
+            @Param("sectionNames") List<String> sectionNames
+    );
+
+    @Query(value = """
+        SELECT DISTINCT
+            ce.student_id AS studentId,
+            COALESCE(sp.full_name, ce.student_name, ce.student_id) AS studentName,
+            co.section_name AS sectionName
+        FROM class_enrollment_cache ce
+        JOIN class_offering_cache co
+            ON co.class_offering_id = ce.class_offering_id
+        LEFT JOIN student_profile_cache sp
+            ON sp.student_id = ce.student_id
+        WHERE co.course_code = :courseCode
+          AND co.academic_year = :academicYear
+          AND co.term = :term
+          AND co.section_name IN (:sectionNames)
+        ORDER BY
+            co.section_name ASC,
+            studentName ASC
+        """, nativeQuery = true)
+    List<Object[]> findClassRecordStudents(
+            @Param("academicYear") String academicYear,
+            @Param("term") String term,
+            @Param("courseCode") String courseCode,
+            @Param("sectionNames") List<String> sectionNames
+    );
+
+    @Query(value = """
+        SELECT
+            ce.student_id AS studentId,
+            e.exam_id AS examId,
+            a.total_score AS score,
+            totals.total_points AS totalPoints,
+            CASE
+                WHEN totals.total_points IS NULL OR totals.total_points = 0 THEN 0
+                ELSE ROUND((COALESCE(a.total_score, 0) / totals.total_points) * 100, 2)
+            END AS percentage,
+            COALESCE(CAST(a.status AS TEXT), 'DID_NOT_TAKE') AS status
+        FROM class_enrollment_cache ce
+        JOIN class_offering_cache co
+            ON co.class_offering_id = ce.class_offering_id
+        JOIN exam_assignment ea
+            ON ea.class_offering_id = co.class_offering_id
+        JOIN exam e
+            ON e.exam_id = ea.exam_id
+        LEFT JOIN exam_attempt a
+            ON a.exam_id = e.exam_id
+           AND a.student_id = ce.student_id
+        LEFT JOIN (
+            SELECT
+                exam_id,
+                SUM(points) AS total_points
+            FROM exam_question
+            GROUP BY exam_id
+        ) totals
+            ON totals.exam_id = e.exam_id
+        WHERE co.course_code = :courseCode
+          AND co.academic_year = :academicYear
+          AND co.term = :term
+          AND co.section_name IN (:sectionNames)
+          AND e.exam_id IN (:examIds)
+        """, nativeQuery = true)
+    List<Object[]> findClassRecordScores(
+            @Param("academicYear") String academicYear,
+            @Param("term") String term,
+            @Param("courseCode") String courseCode,
+            @Param("sectionNames") List<String> sectionNames,
+            @Param("examIds") List<Long> examIds
+    );
+
+
 }

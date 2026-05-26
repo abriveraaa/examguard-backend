@@ -796,39 +796,27 @@ public class ExamPortfolioPdfExporter extends AbstractPdfReportExporter {
     ) throws DocumentException {
 
         List<ReportStudentSummaryDTO> students =
-                reportRepository.findStudentSummariesForReport(
-                        examId,
-                        classOfferingId
-                );
+                reportRepository.findStudentSummariesForReport(examId, classOfferingId);
 
         List<ReportStudentAnswerDTO> answers =
-                reportRepository.findStudentAnswersForReport(
-                        examId,
-                        classOfferingId
-                );
+                reportRepository.findStudentAnswersForReport( examId, classOfferingId);
 
         List<ReportEssayRubricScoreDTO> rubricScores =
-                reportRepository.findEssayRubricScoresForReport(
-                        examId,
-                        classOfferingId
-                );
+                reportRepository.findEssayRubricScoresForReport( examId, classOfferingId);
 
         Map<String, List<ReportEssayRubricScoreDTO>> rubricScoresByAttemptAndQuestion =
-                rubricScores.stream()
-                        .collect(Collectors.groupingBy(
-                                r -> r.attemptId() + "-" + r.questionId()
+                rubricScores.stream().collect(Collectors.groupingBy(
+                        r -> r.attemptId() + "-" + r.questionId()
                         ));
 
         List<ReportChoiceDTO> choices =
                 reportRepository.findChoicesForReport(examId);
 
         Map<Long, List<ReportChoiceDTO>> choicesByQuestionId =
-                choices.stream()
-                        .collect(Collectors.groupingBy(ReportChoiceDTO::questionId));
+                choices.stream().collect(Collectors.groupingBy(ReportChoiceDTO::questionId));
 
         Map<String, List<ReportStudentAnswerDTO>> answersByStudentId =
-                answers.stream()
-                        .collect(Collectors.groupingBy(ReportStudentAnswerDTO::studentId));
+                answers.stream().collect(Collectors.groupingBy(ReportStudentAnswerDTO::studentId));
 
         List<Long> answerIds =
                 answers.stream()
@@ -840,12 +828,11 @@ public class ExamPortfolioPdfExporter extends AbstractPdfReportExporter {
         Map<Long, List<ExamAnswerReviewLog>> feedbackLogsByAnswerId =
                 answerIds.isEmpty()
                         ? Map.of()
-                        : examAnswerReviewLogRepository
-                        .findFeedbackLogsByAnswerIds(answerIds)
-                        .stream()
-                        .collect(Collectors.groupingBy(
-                                log -> log.getAnswer().getAnswerId()
-                        ));
+                        : examAnswerReviewLogRepository.findFeedbackLogsByAnswerIds(answerIds)
+                            .stream()
+                            .collect(Collectors.groupingBy(
+                                    log -> log.getAnswer().getAnswerId()
+                            ));
 
         for (ReportStudentSummaryDTO student : students) {
             if ("DID_NOT_TAKE".equalsIgnoreCase(student.attemptStatus())) {
@@ -867,8 +854,6 @@ public class ExamPortfolioPdfExporter extends AbstractPdfReportExporter {
             );
         }
     }
-
-
 
     // HELPER
 

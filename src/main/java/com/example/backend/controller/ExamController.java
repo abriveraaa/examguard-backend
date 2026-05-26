@@ -23,7 +23,6 @@ import com.example.backend.report.model.ReportExportMode;
 import com.example.backend.repository.cache.FacultyProfileCacheRepository;
 import com.example.backend.repository.cache.StudentProfileCacheRepository;
 import com.example.backend.repository.core.AdminProfileRepository;
-import com.example.backend.repository.core.UserAccessRepository;
 import com.example.backend.service.auth.AuthService;
 import com.example.backend.service.core.SystemActivityLogService;
 import com.example.backend.service.exam.ExamAssignmentService;
@@ -31,6 +30,7 @@ import com.example.backend.service.exam.ExamService;
 import com.example.backend.service.exam.ExamTemplateService;
 import com.example.backend.service.exam.ExamWorkspaceService;
 import com.example.backend.service.report.ReportExportService;
+import lombok.AllArgsConstructor;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -51,6 +51,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/exams")
+@AllArgsConstructor
 public class ExamController {
 
     private final ExamService examService;
@@ -63,29 +64,6 @@ public class ExamController {
     private final FacultyProfileCacheRepository facultyProfileCacheRepository;
     private final StudentProfileCacheRepository studentProfileCacheRepository;
     private final AuthService authService;
-
-
-    public ExamController(ExamService examService,
-                          ExamAssignmentService examAssignmentService,
-                          ExamWorkspaceService examWorkspaceService,
-                          ExamTemplateService examTemplateService,
-                          ReportExportService reportExportService,
-                          SystemActivityLogService activityLogService,
-                          AdminProfileRepository adminProfileRepository,
-                          FacultyProfileCacheRepository facultyProfileCacheRepository,
-                          StudentProfileCacheRepository studentProfileCacheRepository,
-                          AuthService authService) {
-        this.examService = examService;
-        this.examAssignmentService = examAssignmentService;
-        this.examWorkspaceService = examWorkspaceService;
-        this.examTemplateService = examTemplateService;
-        this.reportExportService = reportExportService;
-        this.activityLogService = activityLogService;
-        this.adminProfileRepository = adminProfileRepository;
-        this.facultyProfileCacheRepository = facultyProfileCacheRepository;
-        this.studentProfileCacheRepository = studentProfileCacheRepository;
-        this.authService = authService;
-    }
 
     // =========================
     // TEMPLATE
@@ -174,10 +152,11 @@ public class ExamController {
     @PostMapping("/draft")
     public ResponseEntity<ExamResult> examDraft(
             @RequestBody ExamRequest request,
-            @RequestHeader("X-User-Id") String schoolId,
-            @RequestHeader("X-Role") String role
+            @RequestHeader("Authorization") String authorization
     ) {
-        ExamResult result = examService.examDraft(request, schoolId, role);
+        UserAccess user = authService.getUserFromSession(authorization);
+
+        ExamResult result = examService.examDraft(request, user.getSchoolId(), user.getRole());
 
         ResponseEntity<ExamResult> response = buildResponse(result);
 
@@ -187,10 +166,11 @@ public class ExamController {
     @PostMapping("/publish")
     public ResponseEntity<ExamResult> examPublish(
             @RequestBody ExamRequest request,
-            @RequestHeader("X-User-Id") String schoolId,
-            @RequestHeader("X-Role") String role
+            @RequestHeader("Authorization") String authorization
     ) {
-        ExamResult result = examService.examPublish(request, schoolId, role);
+        UserAccess user = authService.getUserFromSession(authorization);
+
+        ExamResult result = examService.examPublish(request, user.getSchoolId(), user.getRole());
         return buildResponse(result);
     }
 
@@ -248,11 +228,12 @@ public class ExamController {
     @GetMapping("/{examId}/taking")
     public ResponseEntity<?> getExamForTaking(
             @PathVariable Long examId,
-            @RequestHeader("X-User-Id") String schoolId,
-            @RequestHeader("X-Role") String role
+            @RequestHeader("Authorization") String authorization
     ) {
+        UserAccess user = authService.getUserFromSession(authorization);
+
         ExamTakingResponse response =
-                examService.getExamForTaking(examId, schoolId, role);
+                examService.getExamForTaking(examId, user.getSchoolId(), user.getRole());
 
         return ResponseEntity.ok(response);
     }
@@ -260,11 +241,12 @@ public class ExamController {
     @PostMapping("/{examId}/begin")
     public ResponseEntity<?> beginExam(
             @PathVariable Long examId,
-            @RequestHeader("X-User-Id") String schoolId,
-            @RequestHeader("X-Role") String role
+            @RequestHeader("Authorization") String authorization
     ) {
+        UserAccess user = authService.getUserFromSession(authorization);
+
         ExamTakingResponse response =
-                examService.beginExamAttempt(examId, schoolId, role);
+                examService.beginExamAttempt(examId, user.getSchoolId(), user.getRole());
 
         return ResponseEntity.ok(response);
     }
@@ -272,22 +254,24 @@ public class ExamController {
     @GetMapping("/{examId}/workspace")
     public ResponseEntity<FacultyExamDetailResponse> getExamWorkspace(
             @PathVariable Long examId,
-            @RequestHeader("X-User-Id") String schoolId,
-            @RequestHeader("X-Role") String role
+            @RequestHeader("Authorization") String authorization
     ) {
+        UserAccess user = authService.getUserFromSession(authorization);
+
         return ResponseEntity.ok(
-                examWorkspaceService.getExamDetail(examId, schoolId, role)
+                examWorkspaceService.getExamDetail(examId, user.getSchoolId(), user.getRole())
         );
     }
 
     @GetMapping("/{examId}/students")
     public ResponseEntity<List<FacultyExamStudentDTO>> getExamStudents(
             @PathVariable Long examId,
-            @RequestHeader("X-User-Id") String schoolId,
-            @RequestHeader("X-Role") String role
+            @RequestHeader("Authorization") String authorization
     ) {
+        UserAccess user = authService.getUserFromSession(authorization);
+
         return ResponseEntity.ok(
-                examWorkspaceService.getExamStudents(examId, schoolId, role)
+                examWorkspaceService.getExamStudents(examId, user.getSchoolId(), user.getRole())
         );
     }
 
@@ -363,22 +347,24 @@ public class ExamController {
     @PutMapping("/{examId}/results/release")
     public ResponseEntity<SimpleMessageResponse> releaseExamResults(
             @PathVariable Long examId,
-            @RequestHeader("X-User-Id") String userId,
-            @RequestHeader("X-Role") String role
+            @RequestHeader("Authorization") String authorization
     ) {
+        UserAccess user = authService.getUserFromSession(authorization);
+
         return ResponseEntity.ok(
-                examWorkspaceService.releaseExamResults(examId, userId, role)
+                examWorkspaceService.releaseExamResults(examId, user.getSchoolId(), user.getRole())
         );
     }
 
     @GetMapping("/{examId}/activity")
     public ResponseEntity<List<FacultyActivityLogDTO>> getExamActivityLogs(
             @PathVariable Long examId,
-            @RequestHeader("X-User-Id") String userId,
-            @RequestHeader("X-Role") String role
+            @RequestHeader("Authorization") String authorization
     ) {
+        UserAccess user = authService.getUserFromSession(authorization);
+
         return ResponseEntity.ok(
-                examWorkspaceService.getExamActivityLogs(examId, userId, role)
+                examWorkspaceService.getExamActivityLogs(examId, user.getSchoolId(), user.getRole())
         );
     }
 
@@ -390,15 +376,16 @@ public class ExamController {
     public ResponseEntity<SimpleMessageResponse> updateAnswerScore(
             @PathVariable Long answerId,
             @RequestBody FacultyUpdateAnswerScoreRequest request,
-            @RequestHeader("X-User-Id") String userId,
-            @RequestHeader("X-Role") String role
+            @RequestHeader("Authorization") String authorization
     ) {
+        UserAccess user = authService.getUserFromSession(authorization);
+
         return ResponseEntity.ok(
                 examWorkspaceService.updateAnswerScore(
                         answerId,
                         request.getPointsAwarded(),
-                        userId,
-                        role
+                        user.getSchoolId(),
+                        user.getRole()
                 )
         );
     }
@@ -406,25 +393,27 @@ public class ExamController {
     @PostMapping("/answers/essay-review")
     public ResponseEntity<ExamResult> saveEssayReview(
             @RequestBody FacultyEssayReviewRequest request,
-            @RequestHeader("X-User-Id") String employeeId,
-            @RequestHeader("X-Role") String role
+            @RequestHeader("Authorization") String authorization
     ) {
+        UserAccess user = authService.getUserFromSession(authorization);
+
         return ResponseEntity.ok(
-                examService.saveEssayReview(request, employeeId, role)
+                examService.saveEssayReview(request, user.getSchoolId(), user.getRole())
         );
     }
 
     @PostMapping("/attempts/{attemptId}/mark-reviewed")
     public ResponseEntity<SimpleMessageResponse> markAttemptReviewed(
             @PathVariable Long attemptId,
-            @RequestHeader("X-User-Id") String userId,
-            @RequestHeader("X-Role") String role
+            @RequestHeader("Authorization") String authorization
     ) {
+        UserAccess user = authService.getUserFromSession(authorization);
+
         return ResponseEntity.ok(
                 examWorkspaceService.markAttemptReviewed(
                         attemptId,
-                        userId,
-                        role
+                        user.getSchoolId(),
+                        user.getRole()
                 )
         );
     }
@@ -483,30 +472,33 @@ public class ExamController {
     @PutMapping("/{examId}/cancel")
     public ResponseEntity<ExamResult> cancelExam(
             @PathVariable Long examId,
-            @RequestHeader("X-User-Id") String schoolId,
-            @RequestHeader("X-Role") String role
+            @RequestHeader("Authorization") String authorization
     ) {
-        ExamResult result = examService.cancelExam(examId, schoolId, role);
+        UserAccess user = authService.getUserFromSession(authorization);
+
+        ExamResult result = examService.cancelExam(examId, user.getSchoolId(), user.getRole());
         return buildResponse(result);
     }
 
     @PutMapping("/{examId}/restore")
     public ResponseEntity<ExamResult> restoreExam(
             @PathVariable Long examId,
-            @RequestHeader("X-User-Id") String schoolId,
-            @RequestHeader("X-Role") String role
+            @RequestHeader("Authorization") String authorization
     ) {
-        ExamResult result = examService.restoreExam(examId, schoolId, role);
+        UserAccess user = authService.getUserFromSession(authorization);
+
+        ExamResult result = examService.restoreExam(examId, user.getSchoolId(), user.getRole());
         return buildResponse(result);
     }
 
     @PutMapping("/{examId}/publish")
     public ResponseEntity<ExamResult> publishExamById(
             @PathVariable Long examId,
-            @RequestHeader("X-User-Id") String schoolId,
-            @RequestHeader("X-Role") String role
+            @RequestHeader("Authorization") String authorization
     ) {
-        ExamResult result = examService.publishExamById(examId, schoolId, role);
+        UserAccess user = authService.getUserFromSession(authorization);
+
+        ExamResult result = examService.publishExamById(examId, user.getSchoolId(), user.getRole());
         return result.isSuccess() ? ResponseEntity.ok(result) : ResponseEntity.badRequest().body(result);
     }
 
@@ -515,10 +507,11 @@ public class ExamController {
     // =========================
     @GetMapping("/class-offerings")
     public ResponseEntity<List<ClassOfferingResponse>> getClassOfferings(
-            @RequestHeader("X-User-Id") String schoolId,
-            @RequestHeader("X-Role") String role
+            @RequestHeader("Authorization") String authorization
     ) {
-        return ResponseEntity.ok(examService.getClassOfferings(schoolId, role));
+        UserAccess user = authService.getUserFromSession(authorization);
+
+        return ResponseEntity.ok(examService.getClassOfferings(user.getSchoolId(), user.getRole()));
     }
 
     // =========================

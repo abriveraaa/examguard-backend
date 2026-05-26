@@ -89,6 +89,25 @@ public class FacultyReportsController {
         );
     }
 
+    @GetMapping("/submission-breakdown")
+    public List<ExamSubmissionBreakdownDTO> getSubmissionBreakdown(
+            @RequestHeader("Authorization") String authorization,
+            @RequestParam String academicYear,
+            @RequestParam String term,
+            @RequestParam(required = false) String courseCode,
+            @RequestParam(required = false) String classOfferingId
+    ) {
+        UserAccess user = authService.getUserFromSession(authorization);
+
+        return facultyReportsService.getSubmissionBreakdown(
+                user.getSchoolId(),
+                academicYear,
+                term,
+                courseCode,
+                classOfferingId
+        );
+    }
+
     @GetMapping("/violations")
     public List<ViolationTypeDTO> getViolations(
             @RequestHeader("Authorization") String authorization,
@@ -156,6 +175,26 @@ public class FacultyReportsController {
                 .header(
                         HttpHeaders.CONTENT_DISPOSITION,
                         "attachment; filename=exam-result-summary.pdf"
+                )
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
+    }
+
+    @GetMapping("/class-record/export/pdf")
+    public ResponseEntity<byte[]> downloadClassRecordPdf(
+            @RequestHeader("Authorization") String authorization,
+            @RequestParam String classOfferingId
+    ) {
+        UserAccess user = authService.getUserFromSession(authorization);
+
+        byte[] pdf = facultyReportsService.exportClassRecordPdf(user.getSchoolId(),classOfferingId);
+
+        String filename = "class-record-" + "-" + classOfferingId + ".pdf";
+
+        return ResponseEntity.ok()
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + filename + "\""
                 )
                 .contentType(MediaType.APPLICATION_PDF)
                 .body(pdf);

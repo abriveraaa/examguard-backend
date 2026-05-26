@@ -11,7 +11,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/admin/users")
-@CrossOrigin // allow JavaFX to call backend
+@CrossOrigin
 public class UserManagementController {
 
     private final AdminUserManagementService service;

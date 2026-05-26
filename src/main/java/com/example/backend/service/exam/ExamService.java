@@ -447,8 +447,7 @@ public class ExamService {
             totalAwarded = totalAwarded.add(awardedPoints);
 
             EssayRubricScore row = rubricScoreRepository
-                    .findByAnswerAnswerIdAndRubricRubricId(
-                            answer.getAnswerId(),
+                    .findByAnswerAnswerIdAndRubricRubricId(answer.getAnswerId(),
                             rubric.getRubricId()
                     )
                     .orElseGet(EssayRubricScore::new);
@@ -468,13 +467,7 @@ public class ExamService {
         }
 
         answer.setPointsAwarded(totalAwarded);
-        answer.setFacultyFeedback(
-                upsertFeedbackBlock(
-                        answer.getFacultyFeedback(),
-                        "Essay Feedback",
-                        request.getFacultyFeedback()
-                )
-        );
+        answer.setFacultyFeedback(request.getFacultyFeedback());
         answer.setIsCorrect(null);
         answer.setNeedsChecking(false);
         answer.setReviewStatus("REVIEWED");
@@ -1652,19 +1645,10 @@ public class ExamService {
         List<ClassOfferingCache> offerings;
 
         if ("ADMIN".equalsIgnoreCase(role)) {
-            offerings = classOfferingCacheRepository.findAll();
+            offerings = classOfferingCacheRepository.findAllActive();
 
         } else if ("FACULTY".equalsIgnoreCase(role)) {
-
-            List<String> ids = facultyLoadCacheRepository
-                    .findByEmployeeId(schoolId)
-                    .stream()
-                    .map(FacultyLoadCache::getClassOfferingId)
-                    .distinct()
-                    .toList();
-
-            offerings = classOfferingCacheRepository.findByClassOfferingIdIn(ids);
-
+            offerings = facultyLoadCacheRepository.findActiveOfferingsByEmployeeId(schoolId);
         } else {
             throw new RuntimeException("Invalid role");
         }
