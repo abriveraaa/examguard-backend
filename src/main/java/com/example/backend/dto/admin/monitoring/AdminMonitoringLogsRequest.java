@@ -11,11 +11,18 @@ public class AdminMonitoringLogsRequest {
     private int size = 20;
 
     private String source = "ALL";
-    // ALL, SYSTEM, VIOLATION
 
     private String search;
     private String role;
     private String severity;
+    private String status;
+    private String module;
+    private String action;
+    private String violationType;
+
+    private String cameraStatus;
+    private String cameraDeviceType;
+    private String cameraStreamRole;
 
     private String range;
     private OffsetDateTime startDate;

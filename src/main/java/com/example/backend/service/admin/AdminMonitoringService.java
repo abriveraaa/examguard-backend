@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 import java.time.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -23,6 +25,7 @@ public class AdminMonitoringService {
     private final AccountStatusLogRepository accountStatusLogRepository;
     private final RegistrarSyncLogRepository registrarSyncLogRepository;
     private final ReactivationLogRepository reactivationLogRepository;
+    private final ExamCameraSessionRepository examCameraSessionRepository;
 
     private static final ZoneId MANILA = ZoneId.of("Asia/Manila");
 
@@ -33,53 +36,146 @@ public class AdminMonitoringService {
         MonitoringOverviewResponse response = new MonitoringOverviewResponse();
 
         List<MetricCardDto> cards = new ArrayList<>();
-        cards.add(monitoringRepository.countActivities(resolved.startDate(), resolved.endDate()));
-        cards.add(violationRepository.countViolations(resolved.startDate(), resolved.endDate()));
-        cards.add(monitoringRepository.countCriticalEvents(resolved.startDate(), resolved.endDate()));
+
+        OffsetDateTime now = ZonedDateTime.now(MANILA)
+                .toOffsetDateTime();
+
+        cards.add(monitoringRepository.countActivities(
+                resolved.startDate(),
+                resolved.endDate()
+        ));
+
+        cards.add(violationRepository.countViolations(
+                resolved.startDate(),
+                resolved.endDate()
+        ));
+
+        cards.add(monitoringRepository.countAttentionEvents(
+                resolved.startDate(),
+                resolved.endDate()
+        ));
+
+        cards.add(sessionLogRepository.countActiveSessions(now));
+
+        cards.add(sessionLogRepository.countSessionVolume(
+                resolved.startDate(),
+                resolved.endDate()
+        ));
 
         response.setSummaryCards(cards);
 
-        List<Object[]> activityRows = switch (resolved.dateFormat()) {
-            case "YYYY" -> monitoringRepository.activityVolumeByYear(
+        String role =
+                normalizeRole(
+                        filter.getRole()
+                );
+
+        /*
+         * LOGIN VOLUME
+         * Source: user_access_log
+         * event_type = LOGIN
+         * event_status = SUCCESS
+         */
+        List<Object[]> loginRows = switch (resolved.dateFormat()) {
+
+            case "YYYY" -> accessLogRepository.loginVolumeByYear(
                     resolved.startDate(),
                     resolved.endDate(),
-                    normalizeRole(filter.getRole())
+                    role
             );
 
-            case "YYYY-MM-DD" -> monitoringRepository.activityVolumeByDay(
+            case "YYYY-MM-DD" -> accessLogRepository.loginVolumeByDay(
                     resolved.startDate(),
                     resolved.endDate(),
-                    normalizeRole(filter.getRole())
+                    role
             );
 
-            case "YYYY-MM-DD HH24:00", "HH24:00" -> monitoringRepository.activityVolumeByHour(
+            case "YYYY-MM-DD HH24:00", "HH24:00" -> accessLogRepository.loginVolumeByHour(
                     resolved.startDate(),
                     resolved.endDate(),
-                    normalizeRole(filter.getRole())
+                    role
             );
 
-            case "YYYY-MM" -> monitoringRepository.activityVolumeByMonth(
+            default -> accessLogRepository.loginVolumeByMonth(
                     resolved.startDate(),
                     resolved.endDate(),
-                    normalizeRole(filter.getRole())
-            );
-
-            default -> monitoringRepository.activityVolumeByMonth(
-                    resolved.startDate(),
-                    resolved.endDate(),
-                    normalizeRole(filter.getRole())
+                    role
             );
         };
 
-        List<ChartPointDto> activityVolume = activityRows.stream()
-                .map(row -> new ChartPointDto(
-                        String.valueOf(row[0]),
-                        String.valueOf(row[1]),
-                        ((Number) row[2]).longValue()
-                ))
-                .toList();
+        List<ChartPointDto> loginVolume =
+                loginRows.stream()
+                        .map(row -> new ChartPointDto(
+                                String.valueOf(row[0]),
+                                String.valueOf(row[1]),
+                                ((Number) row[2]).longValue()
+                        ))
+                        .toList();
 
-        response.setActivityVolume(activityVolume);
+        if ("HH24:00".equals(resolved.dateFormat())) {
+            loginVolume = fillMissingHourlyPoints(
+                    loginVolume,
+                    resolved.startDate(),
+                    resolved.endDate()
+            );
+        }
+
+        response.setLoginVolume(loginVolume);
+
+        /*
+         * CONCURRENT USERS
+         * Source: user_session_log
+         */
+        List<Object[]> concurrentRows = switch (resolved.dateFormat()) {
+
+            case "YYYY" -> sessionLogRepository.concurrentUsersByYear(
+                    resolved.startDate(),
+                    resolved.endDate(),
+                    role
+            );
+
+            case "YYYY-MM-DD" -> sessionLogRepository.concurrentUsersByDay(
+                    resolved.startDate(),
+                    resolved.endDate(),
+                    role
+            );
+
+            case "YYYY-MM-DD HH24:00", "HH24:00" -> sessionLogRepository.concurrentUsersByHour(
+                    resolved.startDate(),
+                    resolved.endDate(),
+                    role
+            );
+
+            default -> sessionLogRepository.concurrentUsersByMonth(
+                    resolved.startDate(),
+                    resolved.endDate(),
+                    role
+            );
+        };
+
+        List<ChartPointDto> concurrentUsers =
+                concurrentRows.stream()
+                        .map(row -> new ChartPointDto(
+                                String.valueOf(row[0]),
+                                String.valueOf(row[1]),
+                                ((Number) row[2]).longValue()
+                        ))
+                        .toList();
+
+        if ("HH24:00".equals(resolved.dateFormat())) {
+            concurrentUsers = fillMissingHourlyPoints(
+                    concurrentUsers,
+                    resolved.startDate(),
+                    resolved.endDate()
+            );
+        }
+
+        response.setConcurrentUsers(concurrentUsers);
+
+        /*
+         * Temporary backward compatibility.
+         * Remove this later after frontend fully uses loginVolume/concurrentUsers.
+         */
+        response.setActivityVolume(loginVolume);
 
         List<ChartPointDto> violationsByType = violationRepository
                 .violationsByTypeRaw(
@@ -88,8 +184,8 @@ public class AdminMonitoringService {
                 )
                 .stream()
                 .map(row -> new ChartPointDto(
-                        (String) row[0],
-                        (String) row[1],
+                        String.valueOf(row[0]),
+                        String.valueOf(row[1]),
                         ((Number) row[2]).longValue()
                 ))
                 .toList();
@@ -105,8 +201,8 @@ public class AdminMonitoringService {
                 )
                 .stream()
                 .map(row -> new ChartPointDto(
-                        (String) row[0],
-                        (String) row[1],
+                        String.valueOf(row[0]),
+                        String.valueOf(row[1]),
                         ((Number) row[2]).longValue()
                 ))
                 .toList();
@@ -114,7 +210,7 @@ public class AdminMonitoringService {
         response.setViolationsByProgram(violationsByProgram);
 
         response.setRecentCriticalEvents(
-                monitoringRepository.recentCriticalEvents(
+                monitoringRepository.recentAttentionSystemEvents(
                         resolved.startDate(),
                         resolved.endDate(),
                         PageRequest.of(0, 10)
@@ -283,12 +379,29 @@ public class AdminMonitoringService {
             );
         }
 
-        merged.sort((a, b) -> {
-            if (a.getStartedAt() == null && b.getStartedAt() == null) return 0;
-            if (a.getStartedAt() == null) return 1;
-            if (b.getStartedAt() == null) return -1;
+        if (source.equals("ALL") || source.equals("CAMERA")) {
+            merged.addAll(
+                    examCameraSessionRepository.findCameraLogsForMonitoring(
+                            resolved.startDate(),
+                            resolved.endDate(),
+                            search
+                    )
+            );
+        }
 
-            return b.getStartedAt().compareTo(a.getStartedAt());
+        AdminMonitoringFilterOptionsDto filterOptions = buildFilterOptions(merged);
+
+        merged = new ArrayList<>(applyColumnFilters(merged, request));
+
+        merged.sort((a, b) -> {
+            OffsetDateTime aTime = a.getStartedAt();
+            OffsetDateTime bTime = b.getStartedAt();
+
+            if (aTime == null && bTime == null) return 0;
+            if (aTime == null) return 1;
+            if (bTime == null) return -1;
+
+            return bTime.compareTo(aTime);
         });
 
         int page = Math.max(request.getPage(), 0);
@@ -299,8 +412,8 @@ public class AdminMonitoringService {
 
         List<AdminLogRowDto> content =
                 fromIndex >= merged.size()
-                        ? List.of()
-                        : merged.subList(fromIndex, toIndex);
+                        ? new ArrayList<>()
+                        : new ArrayList<>(merged.subList(fromIndex, toIndex));
 
         long totalElements = merged.size();
         int totalPages = (int) Math.ceil((double) totalElements / size);
@@ -308,6 +421,7 @@ public class AdminMonitoringService {
 
         return new AdminMonitoringLogsResponse(
                 content,
+                filterOptions,
                 totalElements,
                 totalPages,
                 page,
@@ -316,9 +430,146 @@ public class AdminMonitoringService {
         );
     }
 
+    private AdminMonitoringFilterOptionsDto buildFilterOptions(List<AdminLogRowDto> rows) {
+        AdminMonitoringFilterOptionsDto options = new AdminMonitoringFilterOptionsDto();
+
+        options.setRoles(distinct(rows.stream().map(AdminLogRowDto::getActorRole).toList()));
+        options.setStatuses(distinct(rows.stream().map(AdminLogRowDto::getStatus).toList()));
+        options.setActions(distinct(rows.stream().map(AdminLogRowDto::getAction).toList()));
+        options.setModules(distinct(rows.stream().map(AdminLogRowDto::getModule).toList()));
+        options.setSeverities(distinct(rows.stream().map(AdminLogRowDto::getSeverity).toList()));
+
+        options.setViolationTypes(
+                distinct(
+                        rows.stream()
+                                .filter(row -> "VIOLATION".equalsIgnoreCase(row.getSource()))
+                                .map(AdminLogRowDto::getAction)
+                                .toList()
+                )
+        );
+
+        options.setCameraStatuses(
+                distinct(
+                        rows.stream()
+                                .filter(row -> "CAMERA".equalsIgnoreCase(row.getSource()))
+                                .map(AdminLogRowDto::getStatus)
+                                .toList()
+                )
+        );
+
+        options.setCameraDeviceTypes(
+                distinct(
+                        rows.stream()
+                                .filter(row -> "CAMERA".equalsIgnoreCase(row.getSource()))
+                                .map(AdminLogRowDto::getAction)
+                                .toList()
+                )
+        );
+
+        return options;
+    }
+
+    private List<String> distinct(List<String> values) {
+        return values.stream()
+                .filter(value -> value != null && !value.isBlank())
+                .map(String::trim)
+                .distinct()
+                .sorted()
+                .toList();
+    }
+
+    private List<AdminLogRowDto> applyColumnFilters(
+            List<AdminLogRowDto> rows,
+            AdminMonitoringLogsRequest request
+    ) {
+        String source = normalizeSource(request.getSource());
+
+        String role = normalizeDropdown(request.getRole());
+        String severity = normalizeDropdown(request.getSeverity());
+        String status = normalizeDropdown(request.getStatus());
+        String module = normalizeDropdown(request.getModule());
+        String action = normalizeDropdown(request.getAction());
+        String violationType = normalizeDropdown(request.getViolationType());
+
+        return new ArrayList<>(
+                rows.stream()
+                        .filter(row -> matches(role, row.getActorRole()))
+                        .filter(row -> matches(status, row.getStatus()))
+                        .filter(row -> {
+                            if (!"VIOLATION".equals(source)) return true;
+                            return matches(severity, row.getSeverity())
+                                    && matches(violationType, row.getAction());
+                        })
+                        .filter(row -> {
+                            if (!"SYSTEM".equals(source)) return true;
+                            return matches(module, row.getModule());
+                        })
+                        .filter(row -> {
+                            if (!"ACCESS".equals(source)
+                                    && !"ACCOUNT".equals(source)
+                                    && !"REGISTRAR".equals(source)) {
+                                return true;
+                            }
+                            return matches(action, row.getAction());
+                        })
+                        .toList()
+        );
+    }
+
+    private List<ChartPointDto> fillMissingHourlyPoints(
+            List<ChartPointDto> points,
+            OffsetDateTime start,
+            OffsetDateTime end
+    ) {
+        List<String> roles = List.of("ADMIN", "FACULTY", "STUDENT");
+
+        Map<String, Long> existing = new java.util.HashMap<>();
+
+        for (ChartPointDto point : points) {
+            existing.put(
+                    point.getLabel() + "|" + point.getCategory(),
+                    point.getValue()
+            );
+        }
+
+        List<ChartPointDto> filled = new ArrayList<>();
+
+        OffsetDateTime cursor = start
+                .atZoneSameInstant(MANILA)
+                .withMinute(0)
+                .withSecond(0)
+                .withNano(0)
+                .toOffsetDateTime();
+
+        OffsetDateTime endHour = end
+                .atZoneSameInstant(MANILA)
+                .withMinute(0)
+                .withSecond(0)
+                .withNano(0)
+                .toOffsetDateTime();
+
+        while (!cursor.isAfter(endHour)) {
+            String label = cursor.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:00"));
+
+            for (String role : roles) {
+                Long value = existing.getOrDefault(label + "|" + role, 0L);
+
+                filled.add(new ChartPointDto(
+                        label,
+                        role,
+                        value
+                ));
+            }
+
+            cursor = cursor.plusHours(1);
+        }
+
+        return filled;
+    }
+
     private String resolveDateFormat(String groupBy, OffsetDateTime start, OffsetDateTime end) {
 
-        if (groupBy == null || groupBy.isBlank() || groupBy.equals("Auto")) {
+        if (groupBy == null || groupBy.isBlank() || groupBy.equalsIgnoreCase("Auto")) {
 
             if (start == null || end == null) {
                 return "YYYY-MM";
@@ -341,11 +592,11 @@ public class AdminMonitoringService {
             return "YYYY";
         }
 
-        return switch (groupBy) {
-            case "Hour" -> "YYYY-MM-DD HH24:00";
-            case "Day" -> "YYYY-MM-DD";
-            case "Month" -> "YYYY-MM";
-            case "Year" -> "YYYY";
+        return switch (groupBy.trim().toUpperCase()) {
+            case "HOUR", "24 HOURS" -> "HH24:00";
+            case "DAY" -> "YYYY-MM-DD";
+            case "MONTH" -> "YYYY-MM";
+            case "YEAR" -> "YYYY";
             default -> "YYYY-MM";
         };
     }
@@ -357,7 +608,11 @@ public class AdminMonitoringService {
     ) {}
 
     private String normalizeRole(String role) {
-        return role == null || role.isBlank() ? "All Roles" : role;
+        if (role == null || role.isBlank() || role.equalsIgnoreCase("All Roles")) {
+            return "All Roles";
+        }
+
+        return role.trim().toUpperCase();
     }
 
     private ResolvedFilter resolveFilterFromLogsRequest(AdminMonitoringLogsRequest request) {
@@ -431,6 +686,43 @@ public class AdminMonitoringService {
         if (value == null) return null;
         return ((Number) value).intValue();
     }
+
+    private String normalizeDropdown(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+
+        String trimmed = value.trim();
+
+        if (trimmed.equalsIgnoreCase("All")
+                || trimmed.equalsIgnoreCase("All Roles")
+                || trimmed.equalsIgnoreCase("All Statuses")
+                || trimmed.equalsIgnoreCase("All Actions")
+                || trimmed.equalsIgnoreCase("All Modules")
+                || trimmed.equalsIgnoreCase("All Severities")
+                || trimmed.equalsIgnoreCase("All Violations")
+                || trimmed.equalsIgnoreCase("All Devices")
+                || trimmed.equalsIgnoreCase("All Stream Roles")
+                || trimmed.equalsIgnoreCase("All Events")
+                || trimmed.equalsIgnoreCase("All Sync Types")) {
+            return null;
+        }
+
+        return trimmed.toUpperCase();
+    }
+
+    private boolean matches(String selectedValue, String actualValue) {
+        if (selectedValue == null) {
+            return true;
+        }
+
+        if (actualValue == null || actualValue.isBlank()) {
+            return false;
+        }
+
+        return actualValue.trim().equalsIgnoreCase(selectedValue);
+    }
+
 
     private OffsetDateTime offsetDateTime(Object value) {
         if (value == null) return null;

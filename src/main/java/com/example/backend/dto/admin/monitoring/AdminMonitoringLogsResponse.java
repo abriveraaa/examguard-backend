@@ -10,6 +10,7 @@ import java.util.List;
 public class AdminMonitoringLogsResponse {
 
     private List<AdminLogRowDto> content;
+    private AdminMonitoringFilterOptionsDto filterOptions;
 
     private long totalElements;
     private int totalPages;

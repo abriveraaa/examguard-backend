@@ -19,7 +19,7 @@ public interface AdminMonitoringRepository extends JpaRepository<SystemActivityL
 
     @Query("""
         SELECT new com.example.backend.dto.admin.monitoring.MetricCardDto(
-            'Total Activities',
+            'System Logs',
             COUNT(l),
             'System activities within selected filters'
         )
@@ -34,9 +34,9 @@ public interface AdminMonitoringRepository extends JpaRepository<SystemActivityL
 
     @Query("""
         SELECT new com.example.backend.dto.admin.monitoring.MetricCardDto(
-            'Critical Events',
+            'Attention Events',
             COUNT(l),
-            'Failed or critical system events'
+            'Failed, critical, or slow system events'
         )
         FROM SystemActivityLog l
         WHERE (l.occurredAt >= :startDate)
@@ -44,85 +44,17 @@ public interface AdminMonitoringRepository extends JpaRepository<SystemActivityL
           AND (
                 UPPER(COALESCE(l.status, '')) IN ('FAILED', 'ERROR', 'CRITICAL')
                 OR LOWER(COALESCE(l.message, '')) LIKE '%critical%'
+                OR COALESCE(l.durationMs, 0) >= 5000
               )
     """)
-    MetricCardDto countCriticalEvents(
+    MetricCardDto countAttentionEvents(
             @Param("startDate") OffsetDateTime startDate,
             @Param("endDate") OffsetDateTime endDate
     );
 
-    @Query(value = """
-    SELECT
-        to_char(l.occurred_at, 'YYYY') AS label,
-        COALESCE(l.actor_role, 'UNKNOWN') AS category,
-        COUNT(*) AS value
-    FROM system_activity_log l
-    WHERE l.occurred_at >= :startDate
-      AND l.occurred_at <= :endDate
-      AND (:role = 'All Roles' OR l.actor_role = :role)
-    GROUP BY label, category
-    ORDER BY label
-""", nativeQuery = true)
-    List<Object[]> activityVolumeByYear(
-            @Param("startDate") OffsetDateTime startDate,
-            @Param("endDate") OffsetDateTime endDate,
-            @Param("role") String role
-    );
-
-    @Query(value = """
-    SELECT
-        to_char(l.occurred_at, 'YYYY-MM') AS label,
-        COALESCE(l.actor_role, 'UNKNOWN') AS category,
-        COUNT(*) AS value
-    FROM system_activity_log l
-    WHERE l.occurred_at >= :startDate
-      AND l.occurred_at <= :endDate
-      AND (:role = 'All Roles' OR l.actor_role = :role)
-    GROUP BY label, category
-    ORDER BY label
-""", nativeQuery = true)
-    List<Object[]> activityVolumeByMonth(
-            @Param("startDate") OffsetDateTime startDate,
-            @Param("endDate") OffsetDateTime endDate,
-            @Param("role") String role
-    );
-
-    @Query(value = """
-    SELECT
-        to_char(l.occurred_at, 'YYYY-MM-DD') AS label,
-        COALESCE(l.actor_role, 'UNKNOWN') AS category,
-        COUNT(*) AS value
-    FROM system_activity_log l
-    WHERE l.occurred_at >= :startDate
-      AND l.occurred_at <= :endDate
-      AND (:role = 'All Roles' OR l.actor_role = :role)
-    GROUP BY label, category
-    ORDER BY label
-""", nativeQuery = true)
-    List<Object[]> activityVolumeByDay(
-            @Param("startDate") OffsetDateTime startDate,
-            @Param("endDate") OffsetDateTime endDate,
-            @Param("role") String role
-    );
-
-    @Query(value = """
-    SELECT
-        to_char(l.occurred_at, 'YYYY-MM-DD HH24:00') AS label,
-        COALESCE(l.actor_role, 'UNKNOWN') AS category,
-        COUNT(*) AS value
-    FROM system_activity_log l
-    WHERE l.occurred_at >= :startDate
-      AND l.occurred_at <= :endDate
-      AND (:role = 'All Roles' OR l.actor_role = :role)
-    GROUP BY label, category
-    ORDER BY label
-""", nativeQuery = true)
-    List<Object[]> activityVolumeByHour(
-            @Param("startDate") OffsetDateTime startDate,
-            @Param("endDate") OffsetDateTime endDate,
-            @Param("role") String role
-    );
-
+    // =======================
+    // DASHBOARD ADMIN LOGS
+    // =======================
     @Query("""
         SELECT new com.example.backend.dto.admin.monitoring.AdminLogRowDto(
             'SYSTEM',
@@ -151,13 +83,15 @@ public interface AdminMonitoringRepository extends JpaRepository<SystemActivityL
         FROM SystemActivityLog l
         WHERE (l.occurredAt >= :startDate)
           AND (l.occurredAt <= :endDate)
+          AND (l.module <> 'EXAM_TAKING')
           AND (
                 UPPER(COALESCE(l.status, '')) IN ('FAILED', 'ERROR', 'CRITICAL')
                 OR LOWER(COALESCE(l.message, '')) LIKE '%critical%'
+                OR COALESCE(l.durationMs, 0) >= 3000
               )
         ORDER BY l.occurredAt DESC
     """)
-    List<AdminLogRowDto> recentCriticalEvents(
+    List<AdminLogRowDto> recentAttentionSystemEvents(
             @Param("startDate") OffsetDateTime startDate,
             @Param("endDate") OffsetDateTime endDate,
             Pageable pageable
@@ -209,4 +143,6 @@ public interface AdminMonitoringRepository extends JpaRepository<SystemActivityL
             @Param("role") String role,
             @Param("search") String search
     );
+
+
 }

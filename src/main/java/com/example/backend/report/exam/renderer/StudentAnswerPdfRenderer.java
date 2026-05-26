@@ -239,13 +239,8 @@ public class StudentAnswerPdfRenderer {
                 .append(safe(log.getNotes()));
 
         if ("VIOLATION_PENALIZED".equalsIgnoreCase(log.getActionType())) {
-            text.append(" | Deduction: ")
-                    .append(formatPoints(log.getDeduction()));
-
-            text.append(" | Score: ")
-                    .append(formatPoints(log.getScoreBefore()))
-                    .append(" → ")
-                    .append(formatPoints(log.getScoreAfter()));
+            text.append(" | Deduction: ").append(formatPoints(log.getDeduction()));
+            text.append(" | Final Score: ").append(formatPoints(log.getScoreAfter()));
         }
 
         if ("VIOLATION_IGNORED".equalsIgnoreCase(log.getActionType())) {

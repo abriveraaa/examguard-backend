@@ -1,6 +1,8 @@
 package com.example.backend.examcamera;
 
+import com.example.backend.entity.exam.ExamCameraSession;
 import com.example.backend.examcamera.dto.*;
+import com.example.backend.repository.core.ExamCameraSessionRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;

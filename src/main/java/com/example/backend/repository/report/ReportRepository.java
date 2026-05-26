@@ -529,12 +529,30 @@ public interface ReportRepository extends Repository<Exam, Long> {
           AND a.status IN ('SUBMITTED', 'AUTO_SUBMITTED')
           AND (:classOfferingId IS NULL OR ea.class_offering_id = :classOfferingId)
     ),
-    answer_stats AS (
+            answer_stats AS (
         SELECT
             q.question_id,
+    
             COUNT(ans.answer_id) AS total_answered,
-            SUM(CASE WHEN ans.is_correct = TRUE THEN 1 ELSE 0 END) AS correct_count,
-            SUM(CASE WHEN ans.is_correct = FALSE THEN 1 ELSE 0 END) AS incorrect_count
+    
+            SUM(
+                CASE
+                    WHEN ans.answer_id IS NOT NULL
+                     AND COALESCE(ans.points_awarded, 0) >= (COALESCE(q.points, 0) / 2.0)
+                    THEN 1
+                    ELSE 0
+                END
+            ) AS correct_count,
+    
+            SUM(
+                CASE
+                    WHEN ans.answer_id IS NOT NULL
+                     AND COALESCE(ans.points_awarded, 0) < (COALESCE(q.points, 0) / 2.0)
+                    THEN 1
+                    ELSE 0
+                END
+            ) AS incorrect_count
+    
         FROM exam_question q
         LEFT JOIN exam_answer ans
             ON ans.question_id = q.question_id
@@ -544,7 +562,7 @@ public interface ReportRepository extends Repository<Exam, Long> {
            )
         WHERE q.exam_id = :examId
         GROUP BY q.question_id
-    )
+            )
     SELECT
         q.question_id,
         q.question_order,

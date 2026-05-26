@@ -1,4 +1,4 @@
-package com.example.backend.examcamera;
+package com.example.backend.entity.exam;
 
 import jakarta.persistence.*;
 import lombok.Getter;

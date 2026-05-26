@@ -62,4 +62,97 @@ public interface UserAccessLogRepository extends JpaRepository<UserAccessLog, Lo
                 @Param("endDate") OffsetDateTime endDate,
                 @Param("search") String search
         );
+
+
+    // ===============
+    // LOGIN COUNT
+    // ===============
+
+    @Query(value = """
+    SELECT
+        to_char(ual.created_at AT TIME ZONE 'Asia/Manila', 'YYYY') AS label,
+        COALESCE(ua.role, 'UNKNOWN') AS category,
+        COUNT(*) AS value
+    FROM user_access_log ual
+    LEFT JOIN user_access ua
+        ON ua.access_id = ual.access_id
+    WHERE ual.created_at >= :startDate
+      AND ual.created_at <= :endDate
+      AND UPPER(COALESCE(ual.event_type, '')) = 'LOGIN'
+      AND UPPER(COALESCE(ual.event_status, '')) = 'SUCCESS'
+      AND (:role = 'All Roles' OR ua.role = :role)
+    GROUP BY label, category
+    ORDER BY label
+""", nativeQuery = true)
+    List<Object[]> loginVolumeByYear(
+            @Param("startDate") OffsetDateTime startDate,
+            @Param("endDate") OffsetDateTime endDate,
+            @Param("role") String role
+    );
+
+    @Query(value = """
+    SELECT
+        to_char(ual.created_at AT TIME ZONE 'Asia/Manila', 'YYYY-MM') AS label,
+        COALESCE(ua.role, 'UNKNOWN') AS category,
+        COUNT(*) AS value
+    FROM user_access_log ual
+    LEFT JOIN user_access ua
+        ON ua.access_id = ual.access_id
+    WHERE ual.created_at >= :startDate
+      AND ual.created_at <= :endDate
+      AND UPPER(COALESCE(ual.event_type, '')) = 'LOGIN'
+      AND UPPER(COALESCE(ual.event_status, '')) = 'SUCCESS'
+      AND (:role = 'All Roles' OR ua.role = :role)
+    GROUP BY label, category
+    ORDER BY label
+""", nativeQuery = true)
+    List<Object[]> loginVolumeByMonth(
+            @Param("startDate") OffsetDateTime startDate,
+            @Param("endDate") OffsetDateTime endDate,
+            @Param("role") String role
+    );
+
+    @Query(value = """
+    SELECT
+        to_char(ual.created_at AT TIME ZONE 'Asia/Manila', 'YYYY-MM-DD') AS label,
+        COALESCE(ua.role, 'UNKNOWN') AS category,
+        COUNT(*) AS value
+    FROM user_access_log ual
+    LEFT JOIN user_access ua
+        ON ua.access_id = ual.access_id
+    WHERE ual.created_at >= :startDate
+      AND ual.created_at <= :endDate
+      AND UPPER(COALESCE(ual.event_type, '')) = 'LOGIN'
+      AND UPPER(COALESCE(ual.event_status, '')) = 'SUCCESS'
+      AND (:role = 'All Roles' OR ua.role = :role)
+    GROUP BY label, category
+    ORDER BY label
+""", nativeQuery = true)
+    List<Object[]> loginVolumeByDay(
+            @Param("startDate") OffsetDateTime startDate,
+            @Param("endDate") OffsetDateTime endDate,
+            @Param("role") String role
+    );
+
+    @Query(value = """
+    SELECT
+        to_char(ual.created_at AT TIME ZONE 'Asia/Manila', 'YYYY-MM-DD HH24:00') AS label,
+        COALESCE(ua.role, 'UNKNOWN') AS category,
+        COUNT(*) AS value
+    FROM user_access_log ual
+    LEFT JOIN user_access ua
+        ON ua.access_id = ual.access_id
+    WHERE ual.created_at >= :startDate
+      AND ual.created_at <= :endDate
+      AND UPPER(COALESCE(ual.event_type, '')) = 'LOGIN'
+      AND UPPER(COALESCE(ual.event_status, '')) = 'SUCCESS'
+      AND (:role = 'All Roles' OR ua.role = :role)
+    GROUP BY label, category
+    ORDER BY label
+""", nativeQuery = true)
+    List<Object[]> loginVolumeByHour(
+            @Param("startDate") OffsetDateTime startDate,
+            @Param("endDate") OffsetDateTime endDate,
+            @Param("role") String role
+    );
 }

@@ -285,6 +285,24 @@ public class ExamResultSummaryService {
         title.setSpacingAfter(10f);
         document.add(title);
 
+        Font noteFont =
+                FontFactory.getFont(
+                        FontFactory.HELVETICA_OBLIQUE,
+                        8f,
+                        new Color(90,90,90)
+                );
+
+        Paragraph note = new Paragraph(
+                "Notes: For essay and manually scored questions, responses with earned scores greater than or equal to 50% of the expected question score are counted as Correct; otherwise they are counted as Incorrect.",
+                noteFont
+        );
+
+        note.setSpacingAfter(8f);
+        note.setIndentationLeft(10f);
+        note.setIndentationRight(10f);
+
+        document.add(note);
+
         PdfPTable table = new PdfPTable(7);
         table.setWidthPercentage(100);
         table.setHeaderRows(1);
