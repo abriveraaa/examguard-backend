@@ -51,11 +51,7 @@ public class AuthController {
 
         String ipAddress = getClientIp(httpRequest);
 
-        LoginResult result = authService.login(
-                request.getUsername(),
-                request.getPassword(),
-                ipAddress
-        );
+        LoginResult result = authService.login(request.getUsername(), request.getPassword(), ipAddress);
 
         if (!result.isSuccess()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)

@@ -1,0 +1,40 @@
+{
+  "assets": [
+    {
+      "key": "object-detector",
+      "version": "1.0.0",
+      "type": "ONNX",
+      "fileName": "yolov8s.onnx"
+    },
+    {
+      "key": "object-labels",
+      "version": "1.0.0",
+      "type": "LABELS",
+      "fileName": "coco.names"
+    },
+    {
+      "key": "face-detector",
+      "version": "1.0.0",
+      "type": "OPENCV_CASCADE",
+      "fileName": "haarcascade_frontalface_default.xml"
+    },
+    {
+      "key": "face-landmarker",
+      "version": "1.0.0",
+      "type": "MEDIAPIPE_TASK",
+      "fileName": "face_landmarker.task"
+    },
+    {
+      "key": "pose-landmarker",
+      "version": "1.0.0",
+      "type": "MEDIAPIPE_TASK",
+      "fileName": "pose_landmarker_lite.task"
+    },
+    {
+      "key": "ai-rules",
+      "version": "1.0.0",
+      "type": "CONFIG",
+      "fileName": "ai-rules.json"
+    }
+  ]
+}

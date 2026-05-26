@@ -1,0 +1,81 @@
+{
+  "enabled": true,
+
+  "cameraQuality": {
+    "enabled": true,
+    "minBrightness": 35,
+    "maxBrightness": 230,
+    "failBlurVariance": 7,
+    "warningBlurVariance": 12,
+    "sampleCount": 8,
+    "minimumValidFrames": 4
+  },
+
+  "opencvFace": {
+    "enabled": true,
+    "requiredOneFaceFrames": 4,
+    "multipleFaceFramesToFail": 2,
+    "minFaceAreaRatio": 0.015,
+    "maxFaceAreaRatio": 0.45,
+    "minCenterXRatio": 0.18,
+    "maxCenterXRatio": 0.82,
+    "minCenterYRatio": 0.12,
+    "maxCenterYRatio": 0.72
+  },
+  "mediapipeFace": {
+    "enabled": true,
+    "required": true,
+    "serviceHost": "127.0.0.1",
+    "servicePort": 5005,
+    "requiredVersion": "1.0.0",
+    "healthEndpoint": "/health",
+    "analyzeEndpoint": "/analyze",
+    "timeoutMs": 3000,
+    "sampleCount": 5,
+    "requiredValidFaceFrames": 3,
+    "maxFaces": 1,
+    "yawThreshold": 0.08,
+    "pitchDownThreshold": 0.14,
+    "startupCommandKey": "mediapipe-face-start-command"
+  },
+  "yolo": {
+    "enabled": true,
+    "modelKey": "object-detector",
+    "labelsKey": "object-labels",
+    "inputSize": 640,
+    "confidenceThreshold": 0.25,
+    "nmsThreshold": 0.45,
+    "phoneConfidence": 0.80,
+    "requiredPhoneHits": 3,
+    "personConfidence": 0.45,
+    "requiredPersonHits": 3,
+    "sideViewSampleCount": 5,
+    "maxPhoneAreaRatio": 0.12,
+    "detectBook": false,
+    "detectPaper": false
+  },
+
+  "lobbySetup": {
+    "enabled": true,
+    "requireSinglePerson": true,
+    "requireFaceVisible": true,
+    "requireCameraNotBlurred": true,
+    "requireGoodLighting": true,
+    "requireNoPhoneDetected": true,
+    "requireNoReviewerDetected": false
+  },
+
+  "violationDurations": {
+    "DEVICE_DETECTED": 3,
+    "REVIEWER_DETECTED": 3,
+    "MULTIPLE_PERSON": 2,
+    "EXAMINEE_NOT_PRESENT": 5,
+    "LOOKING_AWAY": 3,
+    "CAMERA_BLURRY": 5,
+    "POOR_LIGHTING": 5,
+    "BAD_CAMERA_SETUP": 3
+  },
+  "objectDetection": {
+    "provider": "YOLO"
+  }
+}
