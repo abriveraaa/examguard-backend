@@ -279,68 +279,73 @@ public class ExamController {
     public ResponseEntity<FacultyAttemptReviewResponse> getStudentAttemptReview(
             @PathVariable Long examId,
             @PathVariable String studentId,
-            @RequestHeader("X-User-Id") String userId,
-            @RequestHeader("X-Role") String role
+            @RequestHeader("Authorization") String authorization
     ) {
+
+        UserAccess user = authService.getUserFromSession(authorization);
+
         return ResponseEntity.ok(
-                examWorkspaceService.getStudentAttemptReview(examId, studentId, userId, role)
+                examWorkspaceService.getStudentAttemptReview(examId, studentId, user.getSchoolId(), user.getRole())
         );
     }
 
     @GetMapping("/{examId}/submissions")
     public ResponseEntity<List<FacultySubmissionSummaryDTO>> getExamSubmissions(
             @PathVariable Long examId,
-            @RequestHeader("X-User-Id") String userId,
-            @RequestHeader("X-Role") String role
+            @RequestHeader("Authorization") String authorization
     ) {
+
+        UserAccess user = authService.getUserFromSession(authorization);
+
         return ResponseEntity.ok(
-                examWorkspaceService.getExamSubmissions(examId, userId, role)
+                examWorkspaceService.getExamSubmissions(examId, user.getSchoolId(), user.getRole())
         );
     }
 
     @GetMapping("/{examId}/violations")
     public ResponseEntity<List<FacultyStudentViolationDTO>> getExamViolations(
             @PathVariable Long examId,
-            @RequestHeader("X-User-Id") String userId,
-            @RequestHeader("X-Role") String role
+            @RequestHeader("Authorization") String authorization
     ) {
+
+        UserAccess user = authService.getUserFromSession(authorization);
+
         return ResponseEntity.ok(
-                examWorkspaceService.getExamViolations(examId, userId, role)
+                examWorkspaceService.getExamViolations(examId, user.getSchoolId(), user.getRole())
         );
     }
 
     @PostMapping("/review/violations/decision")
     public SimpleMessageResponse applyViolationDecision(
             @RequestBody ViolationDecisionRequest request,
-            @RequestHeader("X-User-Id") String employeeId,
-            @RequestHeader("X-Role") String role
+            @RequestHeader("Authorization") String authorization
     ) {
-        return examService.applyViolationDecision(
-                request,
-                employeeId,
-                role
-        );
+        UserAccess user = authService.getUserFromSession(authorization);
+
+        return examService.applyViolationDecision(request, user.getSchoolId(), user.getRole());
     }
 
     @GetMapping("/review/answers/{answerId}/timeline")
     public ResponseEntity<List<AnswerReviewTimelineDTO>> getAnswerReviewTimeline(
             @PathVariable Long answerId,
-            @RequestHeader("X-User-Id") String employeeId,
-            @RequestHeader("X-Role") String role
+            @RequestHeader("Authorization") String authorization
     ) {
+        UserAccess user = authService.getUserFromSession(authorization);
+
         return ResponseEntity.ok(
-                examWorkspaceService.getAnswerReviewTimeline(answerId, employeeId, role)
+                examWorkspaceService.getAnswerReviewTimeline(answerId, user.getSchoolId(), user.getRole())
         );
     }
 
     @GetMapping("/{examId}/leaderboard")
     public ResponseEntity<List<FacultyLeaderboardDTO>> getExamLeaderboard(
             @PathVariable Long examId,
-            @RequestHeader("X-User-Id") String userId,
-            @RequestHeader("X-Role") String role
+            @RequestHeader("Authorization") String authorization
     ) {
+        UserAccess user = authService.getUserFromSession(authorization);
+
         return ResponseEntity.ok(
-                examWorkspaceService.getExamLeaderboard(examId, userId, role)
+                examWorkspaceService.getExamLeaderboard(examId, user.getSchoolId(), user.getRole())
         );
     }
 
@@ -524,14 +529,15 @@ public class ExamController {
             @PathVariable Long examId,
             @RequestParam(required = false) String classOfferingId,
             @RequestParam(defaultValue = "MERGED") String mode,
-            @RequestHeader("X-User-Id") String userId,
-            @RequestHeader("X-Role") String role
+            @RequestHeader("Authorization") String authorization
     ) {
 
         long start = System.currentTimeMillis();
 
-        if (!"ADMIN".equalsIgnoreCase(role)
-                && !"FACULTY".equalsIgnoreCase(role)) {
+        UserAccess user = authService.getUserFromSession(authorization);
+
+        if (!"ADMIN".equalsIgnoreCase(user.getRole())
+                && !"FACULTY".equalsIgnoreCase(user.getRole())) {
 
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN,
@@ -551,14 +557,14 @@ public class ExamController {
                 examId,
                 exportMode,
                 classOfferingId,
-                buildGeneratedByText(userId, role)
+                buildGeneratedByText(user.getSchoolId(), user.getRole())
         );
 
         long durationMs = System.currentTimeMillis() - start;
 
         activityLogService.log(
-                userId,
-                role,
+                user.getSchoolId(),
+                user.getRole(),
                 "REPORTS",
                 "GENERATE_EXAM_PORTFOLIO",
                 "SUCCESS",

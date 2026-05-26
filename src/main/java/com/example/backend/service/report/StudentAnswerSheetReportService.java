@@ -11,6 +11,7 @@ import com.example.backend.report.common.ReportPdfUtil;
 import com.example.backend.repository.exam.ExamRepository;
 import com.example.backend.repository.report.ReportRepository;
 import com.lowagie.text.Document;
+import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +25,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
+@AllArgsConstructor
 public class StudentAnswerSheetReportService {
 
     private final ExamRepository examRepository;
@@ -31,19 +33,6 @@ public class StudentAnswerSheetReportService {
     private final ReportRepository reportRepository;
     private final StudentAnswerPdfRenderer studentAnswerPdfRenderer;
     private final ExamAnswerReviewLogRepository examAnswerReviewLogRepository;
-
-    public StudentAnswerSheetReportService(
-            ExamRepository examRepository,
-            ExamAttemptRepository examAttemptRepository,
-            ReportRepository reportRepository,
-            StudentAnswerPdfRenderer studentAnswerPdfRenderer, ExamAnswerReviewLogRepository examAnswerReviewLogRepository
-    ) {
-        this.examRepository = examRepository;
-        this.examAttemptRepository = examAttemptRepository;
-        this.reportRepository = reportRepository;
-        this.studentAnswerPdfRenderer = studentAnswerPdfRenderer;
-        this.examAnswerReviewLogRepository = examAnswerReviewLogRepository;
-    }
 
     @Transactional
     public byte[] generate(Long examId, String studentId) {

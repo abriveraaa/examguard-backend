@@ -165,9 +165,16 @@ public class StudentService {
 
         Map<Long, List<ExamViolationLog>> violationsByQuestionId =
                 violationLogRepository
-                        .findByAttemptAttemptIdOrderByOccurredAtAsc(attempt.getAttemptId())
+                        .findByAttemptAttemptIdOrderByOccurredAtAsc(
+                                attempt.getAttemptId()
+                        )
                         .stream()
                         .filter(v -> v.getQuestion() != null)
+                        .filter(v ->
+                                !"IGNORED".equalsIgnoreCase(
+                                        v.getReviewStatus()
+                                )
+                        )
                         .collect(Collectors.groupingBy(
                                 v -> v.getQuestion().getQuestionId(),
                                 LinkedHashMap::new,

@@ -41,9 +41,7 @@ public class StudentController {
     ) {
         UserAccess user = authService.getUserFromSession(authorization);
 
-        return ResponseEntity.ok(
-                studentService.getDashboard(user.getSchoolId(), user.getRole())
-        );
+        return ResponseEntity.ok(studentService.getDashboard(user.getSchoolId(), user.getRole()));
     }
 
     @PostMapping("/dashboard/results/{examId}/view")

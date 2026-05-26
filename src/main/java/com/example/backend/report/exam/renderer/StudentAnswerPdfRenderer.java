@@ -220,9 +220,7 @@ public class StudentAnswerPdfRenderer {
             for (ExamAnswerReviewLog log : violationFeedbackLogs) {
                 Paragraph item =
                         new Paragraph(
-                                formatFeedbackTimestamp(log.getCreatedAt()) +
-                                        " - " +
-                                        log.getNotes(),
+                                formatViolationFeedbackLine(log),
                                 bodyFont
                         );
 
@@ -233,13 +231,37 @@ public class StudentAnswerPdfRenderer {
         }
     }
 
+    private String formatViolationFeedbackLine(ExamAnswerReviewLog log) {
+        StringBuilder text = new StringBuilder();
+
+        text.append(formatFeedbackTimestamp(log.getCreatedAt()))
+                .append(" - ")
+                .append(safe(log.getNotes()));
+
+        if ("VIOLATION_PENALIZED".equalsIgnoreCase(log.getActionType())) {
+            text.append(" | Deduction: ")
+                    .append(formatPoints(log.getDeduction()));
+
+            text.append(" | Score: ")
+                    .append(formatPoints(log.getScoreBefore()))
+                    .append(" → ")
+                    .append(formatPoints(log.getScoreAfter()));
+        }
+
+        if ("VIOLATION_IGNORED".equalsIgnoreCase(log.getActionType())) {
+            text.append(" | Decision: Ignored");
+        }
+
+        return text.toString();
+    }
+
     private String formatFeedbackTimestamp(OffsetDateTime value) {
         if (value == null) {
             return "";
         }
 
         return value.format(
-                DateTimeFormatter.ofPattern("MMM dd, yyyy hh:mm a")
+                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss ")
         );
     }
 
@@ -279,12 +301,6 @@ public class StudentAnswerPdfRenderer {
                             + formatPoints(answer.questionPoints())
             );
         }
-
-        addGeneralFeedbackLine(document, answer.facultyFeedback());
-
-        Paragraph spacer = new Paragraph("");
-        spacer.setSpacingAfter(3f);
-        document.add(spacer);
     }
 
     private void addStudentQuestionRow(Document document, String questionText, String points) throws DocumentException {

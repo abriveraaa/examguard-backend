@@ -889,20 +889,12 @@ public class ExamService {
         ExamAnswer answer = answerRepository.findById(request.getAnswerId())
                 .orElseThrow(() -> new RuntimeException("Answer not found."));
 
-        BigDecimal currentScore = answer.getPointsAwarded() == null
-                ? BigDecimal.ZERO
-                : answer.getPointsAwarded();
-
         BigDecimal deduction = request.getDeduction() == null
                 ? BigDecimal.ZERO
                 : request.getDeduction();
 
         if (deduction.compareTo(BigDecimal.ZERO) < 0) {
             throw new RuntimeException("Deduction cannot be negative.");
-        }
-
-        if (deduction.compareTo(currentScore) > 0) {
-            throw new RuntimeException("Deduction cannot be greater than current score.");
         }
 
         String decision = request.getDecision() == null
@@ -919,6 +911,14 @@ public class ExamService {
 
         BigDecimal scoreAfter = scoreBefore;
 
+        if ("PENALIZED".equalsIgnoreCase(decision)) {
+            if (deduction.compareTo(scoreBefore) > 0) {
+                throw new RuntimeException("Deduction cannot be greater than current score.");
+            }
+
+            scoreAfter = scoreBefore.subtract(deduction);
+        }
+
         List<ExamViolationLog> violations =
                 violationLogRepository
                         .findByAttemptAttemptIdAndQuestionQuestionId(
@@ -926,48 +926,15 @@ public class ExamService {
                                 request.getQuestionId()
                         );
 
-        for (ExamViolationLog violation : violations) {
-
-            String previousStatus = violation.getReviewStatus();
-
-            BigDecimal previousDeduction =
-                    reviewLogRepository
-                            .findTopByViolationViolationIdAndActionTypeOrderByCreatedAtDesc(
-                                    violation.getViolationId(),
-                                    "VIOLATION_PENALIZED"
-                            )
-                            .map(ExamAnswerReviewLog::getDeduction)
-                            .orElse(BigDecimal.ZERO);
-
-            boolean wasPenalized =
-                    "PENALIZED".equalsIgnoreCase(previousStatus);
-
-            boolean nowPenalized =
-                    "PENALIZED".equalsIgnoreCase(decision);
-
-            // Restore previous penalty first if it was already penalized.
-            if (wasPenalized && previousDeduction.compareTo(BigDecimal.ZERO) > 0) {
-                scoreAfter = scoreAfter.add(previousDeduction);
-            }
-
-            // Apply new penalty if current decision is PENALIZED.
-            if (nowPenalized) {
-                if (deduction.compareTo(scoreAfter) > 0) {
-                    throw new RuntimeException(
-                            "Deduction cannot be greater than restored current score."
-                    );
-                }
-
-                scoreAfter = scoreAfter.subtract(deduction);
-            }
-
-            answer.setPointsAwarded(scoreAfter);
-        }
-
         OffsetDateTime reviewedAt = OffsetDateTime.now();
 
-        for (ExamViolationLog violation : violations) {
+        answer.setPointsAwarded(scoreAfter);
+        answer.setManuallyReviewed(true);
+        answer.setNeedsChecking(false);
+        answer.setReviewStatus("REVIEWED");
+        answerRepository.save(answer);
 
+        for (ExamViolationLog violation : violations) {
             String previousStatus = violation.getReviewStatus();
 
             violation.setReviewStatus(decision);
@@ -977,13 +944,16 @@ public class ExamService {
             violationLogRepository.save(violation);
 
             ExamAnswerReviewLog log = new ExamAnswerReviewLog();
-
             log.setExam(violation.getExam());
             log.setAttempt(violation.getAttempt());
             log.setAnswer(answer);
             log.setQuestion(violation.getQuestion());
             log.setViolation(violation);
-            log.setActionType( "PENALIZED".equalsIgnoreCase(decision) ? "VIOLATION_PENALIZED" : "VIOLATION_IGNORED");
+            log.setActionType(
+                    "PENALIZED".equalsIgnoreCase(decision)
+                            ? "VIOLATION_PENALIZED"
+                            : "VIOLATION_IGNORED"
+            );
             log.setPreviousValue(previousStatus);
             log.setNewValue(decision);
             log.setScoreBefore(scoreBefore);
@@ -992,21 +962,11 @@ public class ExamService {
             log.setNotes(request.getFeedback());
             log.setCreatedBy(employeeId);
             log.setCreatedByRole(role);
+
             reviewLogRepository.save(log);
         }
 
-        answer.setManuallyReviewed(true);
-        answer.setNeedsChecking(false);
-        answer.setReviewStatus("REVIEWED");
-        answerRepository.save(answer);
-
-        violationLogRepository.markQuestionViolationsReviewed(
-                request.getAttemptId(),
-                request.getQuestionId(),
-                decision,
-                employeeId,
-                OffsetDateTime.now()
-        );
+        recomputeAttemptScore(answer.getAttempt());
 
         return new SimpleMessageResponse(true, "Violation decision saved.");
     }
