@@ -14,9 +14,9 @@ public class PublicBrandingController {
         BrandingResponse response = new BrandingResponse();
         response.setSchoolName("Polytechnic University of the Philippines");
         response.setShortName("PUP");
-        response.setLogoUrl("/uploads/branding/PUPLogo.png");
-        response.setPictureUrl1("/uploads/branding/card-default.png");
-        response.setPictureUrl2("/uploads/branding/card-overlay.png");
+        response.setLogoUrl("/static/branding/PUPLogo.png");
+        response.setPictureUrl1("/static/branding/card-default.png");
+        response.setPictureUrl2("/static/branding/card-overlay.png");
         response.setPrimaryColor("#800000");
         response.setSecondaryColor("#D4AF37");
         response.setProjectName("ExamGuard");
