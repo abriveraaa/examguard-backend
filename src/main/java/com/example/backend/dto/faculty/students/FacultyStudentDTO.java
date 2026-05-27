@@ -2,7 +2,8 @@ package com.example.backend.dto.faculty.students;
 
 public record FacultyStudentDTO(
         String studentId,
-        String fullName,
+        String firstName,
+        String lastName,
         String emailAddress,
 
         String collegeCode,

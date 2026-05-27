@@ -30,4 +30,5 @@ public class AdminMonitoringLogsRequest {
 
     private String academicYear;
     private String term;
+    private String format;
 }

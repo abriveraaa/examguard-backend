@@ -1,8 +1,12 @@
 package com.example.backend.service.admin;
 
 import com.example.backend.dto.admin.monitoring.*;
+import com.example.backend.entity.core.UserAccess;
 import com.example.backend.repository.admin.AdminMonitoringRepository;
 import com.example.backend.repository.admin.AdminViolationMonitoringRepository;
+import com.example.backend.entity.core.UserAccess;
+import com.example.backend.report.admin.MonitoringLogsExcelExporter;
+import com.example.backend.report.admin.MonitoringLogsPdfExporter;
 import com.example.backend.repository.core.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -12,7 +16,6 @@ import java.time.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -26,6 +29,8 @@ public class AdminMonitoringService {
     private final RegistrarSyncLogRepository registrarSyncLogRepository;
     private final ReactivationLogRepository reactivationLogRepository;
     private final ExamCameraSessionRepository examCameraSessionRepository;
+    private final MonitoringLogsPdfExporter monitoringPdfExporter;
+    private final MonitoringLogsExcelExporter monitoringExcelExporter;
 
     private static final ZoneId MANILA = ZoneId.of("Asia/Manila");
 
@@ -283,6 +288,32 @@ public class AdminMonitoringService {
 
         return new ResolvedFilter(start, end, dateFormat);
     }
+
+
+    // ==========
+    // REPORT
+    // =========
+
+
+    public byte[] exportLogs(AdminMonitoringLogsRequest request, UserAccess user) {
+        request.setPage(0);
+        request.setSize(100000);
+
+        AdminMonitoringLogsResponse response = getLogs(request);
+
+        String format = request.getFormat() == null ? "PDF" : request.getFormat().toUpperCase();
+
+        if ("EXCEL".equals(format)) {
+            return monitoringExcelExporter.export(response.getContent(), request, user);
+        }
+
+        return monitoringPdfExporter.export(response.getContent(), request, user);
+    }
+
+
+    // ==========
+    // HELPER
+    // ==========
 
     public AdminMonitoringLogsResponse getLogs(AdminMonitoringLogsRequest request) {
 

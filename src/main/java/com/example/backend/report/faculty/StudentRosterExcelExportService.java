@@ -82,10 +82,7 @@ public class StudentRosterExcelExportService {
                                 student.studentId()
                         );
 
-                row.createCell(1)
-                        .setCellValue(
-                                student.fullName()
-                        );
+                row.createCell(1).setCellValue(student.lastName() + ", " +  student.firstName());
 
                 row.createCell(2)
                         .setCellValue(

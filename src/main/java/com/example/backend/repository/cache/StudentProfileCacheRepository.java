@@ -34,7 +34,8 @@ public interface StudentProfileCacheRepository extends JpaRepository<StudentProf
     @Query("""
     SELECT DISTINCT new com.example.backend.dto.faculty.students.FacultyStudentDTO(
         s.studentId,
-        CONCAT(s.firstName, ' ', s.lastName),
+        s.firstName,
+        s.lastName,
         s.emailAddress,
 
         s.collegeCode,
@@ -58,7 +59,7 @@ public interface StudentProfileCacheRepository extends JpaRepository<StudentProf
         ON co.classOfferingId = ce.classOfferingId
     WHERE ce.classOfferingId = :classOfferingId
     AND ce.status = 'ENROLLED'
-    ORDER BY CONCAT(s.firstName, ' ', s.lastName)
+    ORDER BY s.studentId
 """)
     List<FacultyStudentDTO> findStudentsByClassOffering(
             @Param("classOfferingId") String classOfferingId
@@ -67,7 +68,8 @@ public interface StudentProfileCacheRepository extends JpaRepository<StudentProf
     @Query("""
     SELECT DISTINCT new com.example.backend.dto.faculty.students.FacultyStudentDTO(
         s.studentId,
-        CONCAT(s.firstName, ' ', s.lastName),
+        s.firstName,
+        s.lastName,
         s.emailAddress,
 
         s.collegeCode,
@@ -96,7 +98,7 @@ public interface StudentProfileCacheRepository extends JpaRepository<StudentProf
     AND co.academicYear = :academicYear
     AND co.term = :term
     AND ce.status = 'ENROLLED'
-    ORDER BY CONCAT(s.firstName, ' ', s.lastName)
+    ORDER BY s.studentId
 """)
     List<FacultyStudentDTO> findStudentsByFacultyPeriod(
             @Param("employeeId") String employeeId,
@@ -107,7 +109,8 @@ public interface StudentProfileCacheRepository extends JpaRepository<StudentProf
     @Query("""
         SELECT DISTINCT new com.example.backend.dto.faculty.students.FacultyStudentDTO(
             sp.studentId,
-            CONCAT(sp.firstName, ' ', sp.lastName),
+            sp.firstName,
+            sp.lastName,
             sp.emailAddress,
         
             sp.collegeCode,
@@ -147,7 +150,8 @@ public interface StudentProfileCacheRepository extends JpaRepository<StudentProf
     @Query("""
         SELECT DISTINCT new com.example.backend.dto.faculty.students.FacultyStudentDTO(
             sp.studentId,
-            CONCAT(sp.firstName, ' ', sp.lastName),
+            sp.firstName,
+            sp.lastName,
             sp.emailAddress,
         
             sp.collegeCode,
@@ -183,7 +187,8 @@ public interface StudentProfileCacheRepository extends JpaRepository<StudentProf
     @Query("""
         SELECT DISTINCT new com.example.backend.dto.faculty.students.FacultyStudentDTO(
             sp.studentId,
-            CONCAT(sp.firstName, ' ', sp.lastName),
+            sp.firstName,
+            sp.lastName,
             sp.emailAddress,
         
             sp.collegeCode,
@@ -227,7 +232,8 @@ public interface StudentProfileCacheRepository extends JpaRepository<StudentProf
     @Query("""
         SELECT DISTINCT new com.example.backend.dto.faculty.students.FacultyStudentDTO(
             sp.studentId,
-            CONCAT(sp.firstName, ' ', sp.lastName),
+            sp.firstName,
+            sp.lastName,
             sp.emailAddress,
         
             sp.collegeCode,

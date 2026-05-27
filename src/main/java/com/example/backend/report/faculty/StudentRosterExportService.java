@@ -104,7 +104,7 @@ public class StudentRosterExportService {
         } else {
             for (FacultyStudentDTO student : students) {
                 addBodyCell(table, student.studentId());
-                addBodyCell(table, student.fullName());
+                addBodyCell(table, student.lastName() + ", " + student.firstName());
                 addBodyCell(table, student.emailAddress());
                 addBodyCell(table, student.collegeName());
                 addBodyCell(table, student.programCode());
