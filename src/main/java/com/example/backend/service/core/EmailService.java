@@ -36,8 +36,21 @@ public class EmailService {
             mailSender.send(message);
 
         } catch (Exception e) {
-            throw new RuntimeException("Failed to send activation email.", e);
+        e.printStackTrace();
+
+        Throwable root = e;
+        while (root.getCause() != null) {
+            root = root.getCause();
         }
+
+        System.out.println("EMAIL ROOT ERROR: " + root.getClass().getName());
+        System.out.println("EMAIL ROOT MESSAGE: " + root.getMessage());
+
+        throw new RuntimeException(
+                "Failed to send activation email. Root cause: " + root.getMessage(),
+                e
+        );
+    }
     }
 
     public void sendResetPasswordEmail(String toEmail, String username, String tempPassword) {
