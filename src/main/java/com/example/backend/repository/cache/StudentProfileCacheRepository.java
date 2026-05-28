@@ -52,7 +52,7 @@ public interface StudentProfileCacheRepository extends JpaRepository<StudentProf
         ua.profileImageUrl
     )
     FROM StudentProfileCache s
-    JOIN UserAccess ua ON ua.schoolId = s.studentId
+    LEFT JOIN UserAccess ua ON ua.schoolId = s.studentId
     JOIN ClassEnrollmentCache ce
         ON ce.studentId = s.studentId
     JOIN ClassOfferingCache co
@@ -71,22 +71,19 @@ public interface StudentProfileCacheRepository extends JpaRepository<StudentProf
         s.firstName,
         s.lastName,
         s.emailAddress,
-
         s.collegeCode,
         s.collegeName,
-
         s.programCode,
         s.programName,
         s.yearLevel,
         s.sectionName,
-
         co.courseCode,
         co.courseDescription,
         co.classOfferingId,
         ua.profileImageUrl
     )
     FROM StudentProfileCache s
-    JOIN UserAccess ua ON ua.schoolId = s.studentId
+    LEFT JOIN UserAccess ua ON ua.schoolId = s.studentId
     JOIN ClassEnrollmentCache ce
         ON ce.studentId = s.studentId
     JOIN FacultyLoadCache fl
@@ -127,7 +124,7 @@ public interface StudentProfileCacheRepository extends JpaRepository<StudentProf
             ua.profileImageUrl
         )
         FROM StudentProfileCache sp
-        JOIN UserAccess ua ON ua.schoolId = sp.studentId
+        LEFT JOIN UserAccess ua ON ua.schoolId = sp.studentId
         JOIN ClassEnrollmentCache ce
         ON ce.studentId = sp.studentId
         JOIN ClassOfferingCache co
@@ -168,7 +165,7 @@ public interface StudentProfileCacheRepository extends JpaRepository<StudentProf
             ua.profileImageUrl
         )
         FROM StudentProfileCache sp
-        JOIN UserAccess ua ON ua.schoolId = sp.studentId
+        LEFT JOIN UserAccess ua ON ua.schoolId = sp.studentId
         JOIN ClassEnrollmentCache ce
         ON ce.studentId = sp.studentId
         JOIN ClassOfferingCache co
@@ -205,7 +202,7 @@ public interface StudentProfileCacheRepository extends JpaRepository<StudentProf
             ua.profileImageUrl
         )
         FROM StudentProfileCache sp
-        JOIN UserAccess ua ON ua.schoolId = sp.studentId
+        LEFT JOIN UserAccess ua ON ua.schoolId = sp.studentId
         JOIN ClassEnrollmentCache ce
         ON ce.studentId = sp.studentId
         JOIN ClassOfferingCache co
@@ -250,7 +247,7 @@ public interface StudentProfileCacheRepository extends JpaRepository<StudentProf
             ua.profileImageUrl
         )
         FROM StudentProfileCache sp
-        JOIN UserAccess ua ON ua.schoolId = sp.studentId
+        LEFT JOIN UserAccess ua ON ua.schoolId = sp.studentId
         JOIN ClassEnrollmentCache ce
         ON ce.studentId = sp.studentId
         JOIN ClassOfferingCache co
