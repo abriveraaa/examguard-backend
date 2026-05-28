@@ -29,10 +29,10 @@ public class PublicBrandingController {
         return response;
     }
 
-    @PostMapping("/upload-ai-file")
+    @PostMapping("/upload-profiles")
     public ResponseEntity<String> uploadAiFile(@RequestParam("file") MultipartFile file) throws IOException {
 
-        Path dir = Paths.get(System.getProperty("user.dir"), "uploads", "ai");
+        Path dir = Paths.get(System.getProperty("user.dir"), "uploads", "profiles");
         Files.createDirectories(dir);
 
         Path target = dir.resolve(file.getOriginalFilename());
