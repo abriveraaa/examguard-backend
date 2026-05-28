@@ -12,6 +12,7 @@ import com.example.backend.entity.core.UserAccess;
 import com.example.backend.service.core.AccountStatusLogService;
 import com.example.backend.service.core.EmailService;
 import com.example.backend.utility.TimeUtil;
+import jakarta.transaction.Transactional;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -158,42 +159,54 @@ public class AuthService {
 
         return new ActivationResult(false, "No matching record was found.", null);
     }
+
+    @Transactional
     private ActivationResult createActivatedAccount(String originalSchoolId,
                                                     String normalizedUsername,
                                                     String email,
                                                     String role,
                                                     String ipAddress) {
-        String tempPassword = generateTempPassword();
 
-        UserAccess user = new UserAccess();
-        user.setSchoolId(originalSchoolId);
-        user.setUsername(normalizedUsername);
-        user.setEmail(email);
-        user.setPasswordHash(passwordEncoder.encode(tempPassword));
-        user.setRole(role);
-        user.setActive(true);
-        user.setBlocked(false);
-        user.setMustChangePassword(true);
-        user.setFailedLoginAttempts(0);
-        user.setActivatedAt(TimeUtil.now());
-        user.setTempPasswordSentAt(TimeUtil.now());
-        user.setTempPasswordExpiry(TimeUtil.now().plusMinutes(5));
+        try {
 
-        userAccessRepository.save(user);
+            String tempPassword = generateTempPassword();
 
-        emailService.sendActivationEmail(email, normalizedUsername, tempPassword);
+            UserAccess user = new UserAccess();
+            user.setSchoolId(originalSchoolId);
+            user.setUsername(normalizedUsername);
+            user.setEmail(email);
+            user.setPasswordHash(passwordEncoder.encode(tempPassword));
+            user.setRole(role);
+            user.setActive(true);
+            user.setBlocked(false);
+            user.setMustChangePassword(true);
+            user.setFailedLoginAttempts(0);
+            user.setActivatedAt(TimeUtil.now());
+            user.setTempPasswordSentAt(TimeUtil.now());
+            user.setTempPasswordExpiry(TimeUtil.now().plusMinutes(5));
 
-        logEvent(user, originalSchoolId, normalizedUsername,
-                "ACTIVATE_ACCOUNT", "SUCCESS", role + " account activated successfully", ipAddress);
+            userAccessRepository.save(user);
 
-        logEvent(user, originalSchoolId, normalizedUsername,
-                "TEMP_PASSWORD_SENT", "SUCCESS", "Temporary password sent to email", ipAddress);
+            emailService.sendActivationEmail(email, normalizedUsername, tempPassword);
 
-        return new ActivationResult(
-                true,
-                "Account activated successfully. Temporary credentials have been sent to your email.",
-                role
-        );
+            logEvent(user, originalSchoolId, normalizedUsername,
+                    "ACTIVATE_ACCOUNT", "SUCCESS", role + " account activated successfully", ipAddress);
+
+            logEvent(user, originalSchoolId, normalizedUsername,
+                    "TEMP_PASSWORD_SENT", "SUCCESS", "Temporary password sent to email", ipAddress);
+
+            return new ActivationResult(
+                    true,
+                    "Account activated successfully. Temporary credentials have been sent to your email.",
+                    role
+            );
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException("Failed to send activation email. Root cause: " + e.getMessage(), e);
+        }
+
+
     }
 
     public LoginResult login(String schoolIdInput, String password, String ipAddress) {
