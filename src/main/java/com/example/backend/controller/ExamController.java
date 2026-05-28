@@ -357,7 +357,7 @@ public class ExamController {
         UserAccess user = authService.getUserFromSession(authorization);
 
         return ResponseEntity.ok(
-                examWorkspaceService.releaseExamResults(examId, user.getSchoolId(), user.getRole())
+                examService.releaseExamResults(examId, user.getSchoolId(), user.getRole())
         );
     }
 

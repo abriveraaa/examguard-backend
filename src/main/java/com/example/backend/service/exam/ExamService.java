@@ -25,6 +25,7 @@ import com.example.backend.service.core.EmailService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
+import lombok.AllArgsConstructor;
 import net.coobird.thumbnailator.Thumbnails;
 import org.jspecify.annotations.NonNull;
 import org.springframework.http.HttpStatus;
@@ -51,6 +52,7 @@ import java.util.stream.Stream;
 import static com.example.backend.entity.enums.ExamStatus.*;
 
 @Service
+@AllArgsConstructor
 public class ExamService {
 
     // Database Repositories
@@ -78,6 +80,7 @@ public class ExamService {
     private final SystemActivityLogService activityLogService;
     private final ExamAnswerReviewLogRepository reviewLogRepository;
     private final ClassEnrollmentCacheRepository classEnrollmentCacheRepository;
+    private final ExamWorkspaceRepository examWorkspaceRepository;
 
     private final Gson gson = new Gson();
 
@@ -88,57 +91,6 @@ public class ExamService {
     private static final DateTimeFormatter DISPLAY_DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final DateTimeFormatter DISPLAY_DATE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
     private static final ZoneId MANILA_ZONE = ZoneId.of("Asia/Manila");
-
-
-    public ExamService(ExamRepository examRepository,
-                       ExamQuestionRepository questionRepository,
-                       ExamChoiceRepository choiceRepository,
-                       ExamAssignmentRepository assignmentRepository,
-                       ExamViolationSettingRepository examViolationSettingRepository,
-                       QuestionViolationOverrideRepository questionViolationOverrideRepository,
-                       ClassOfferingCacheRepository classOfferingCacheRepository,
-                       ExamStatusService examStatusService,
-                       AdminProfileRepository adminProfileRepository,
-                       StudentProfileCacheRepository studentProfileCacheRepository,
-                       FacultyProfileCacheRepository facultyProfileCacheRepository,
-                       FacultyLoadCacheRepository facultyLoadCacheRepository,
-                       ExamTemplateService examTemplateService,
-                       EmailService emailService,
-                       ExamAttemptRepository attemptRepository,
-                       ExamAttemptChoiceOrderRepository attemptChoiceOrderRepository,
-                       ExamTakingCacheService examTakingCacheService,
-                       ExamViolationLogRepository violationLogRepository,
-                       ExamAnswerRepository answerRepository,
-                       EssayRubricRepository essayRubricRepository,
-                       EssayRubricScoreRepository rubricScoreRepository,
-                       SystemActivityLogService activityLogService,
-                       ExamAnswerReviewLogRepository reviewLogRepository,
-                       ClassEnrollmentCacheRepository classEnrollmentCacheRepository) {
-        this.examRepository = examRepository;
-        this.questionRepository = questionRepository;
-        this.choiceRepository = choiceRepository;
-        this.assignmentRepository = assignmentRepository;
-        this.examViolationSettingRepository = examViolationSettingRepository;
-        this.questionViolationOverrideRepository = questionViolationOverrideRepository;
-        this.classOfferingCacheRepository = classOfferingCacheRepository;
-        this.examStatusService = examStatusService;
-        this.adminProfileRepository = adminProfileRepository;
-        this.studentProfileCacheRepository = studentProfileCacheRepository;
-        this.facultyProfileCacheRepository = facultyProfileCacheRepository;
-        this.facultyLoadCacheRepository = facultyLoadCacheRepository;
-        this.examTemplateService = examTemplateService;
-        this.emailService = emailService;
-        this.attemptRepository = attemptRepository;
-        this.attemptChoiceOrderRepository = attemptChoiceOrderRepository;
-        this.examTakingCacheService = examTakingCacheService;
-        this.violationLogRepository = violationLogRepository;
-        this.answerRepository = answerRepository;
-        this.essayRubricRepository = essayRubricRepository;
-        this.rubricScoreRepository = rubricScoreRepository;
-        this.activityLogService = activityLogService;
-        this.reviewLogRepository = reviewLogRepository;
-        this.classEnrollmentCacheRepository = classEnrollmentCacheRepository;
-    }
 
     // ====================
     // DATABASE INTERACTION
@@ -212,8 +164,7 @@ public class ExamService {
 
         Exam savedExam = examRepository.save(exam);
 
-        List<ExamAssignment> assignments =
-                assignmentRepository.findByExamExamId(examId);
+        List<ExamAssignment> assignments = assignmentRepository.findByExamExamId(examId);
 
         for (ExamAssignment assignment : assignments) {
             assignment.setStatus(PUBLISHED);
@@ -1519,6 +1470,153 @@ public class ExamService {
 
         return response;
     }
+
+    @jakarta.transaction.Transactional
+    public SimpleMessageResponse releaseExamResults(
+            Long examId,
+            String employeeId,
+            String role
+    ) {
+        long start = System.currentTimeMillis();
+
+        try {
+            validateRole(role);
+
+            if (!examWorkspaceRepository.canAccessExam(examId, employeeId, role)) {
+                throw new RuntimeException("Exam not found or access denied.");
+            }
+
+            Exam exam = examRepository.findById(examId)
+                    .orElseThrow(() ->
+                            new RuntimeException("Exam not found.")
+                    );
+
+            if (Boolean.TRUE.equals(exam.getResultsReleased())) {
+                long durationMs = System.currentTimeMillis() - start;
+
+                activityLogService.log(
+                        employeeId,
+                        role,
+                        "RESULTS",
+                        "RELEASE_RESULTS",
+                        "FAILED",
+                        "Results already released for exam ID " + examId + ".",
+                        examId,
+                        null,
+                        null,
+                        durationMs
+                );
+
+                return new SimpleMessageResponse(
+                        false,
+                        "Results are already released."
+                );
+            }
+
+            backfillAttemptScoresBeforeRelease(examId);
+            exam.setResultsReleased(true);
+            exam.setResultsReleasedAt(OffsetDateTime.now());
+            Exam savedExam = examRepository.save(exam);
+
+            List<ExamAssignment> assignments = assignmentRepository.findByExamExamId(examId);
+
+            List<String> classOfferingIds = assignments.stream()
+                    .map(ExamAssignment::getClassOfferingId)
+                    .toList();
+
+            notifyStudents(savedExam, classOfferingIds, ExamStatus.RESULTS_RELEASED);
+
+            long durationMs = System.currentTimeMillis() - start;
+
+            activityLogService.log(
+                    employeeId,
+                    role,
+                    "RESULTS",
+                    "RELEASE_RESULTS",
+                    "SUCCESS",
+                    "Released results for exam: " + exam.getTitle(),
+                    examId,
+                    null,
+                    null,
+                    durationMs
+            );
+
+            return new SimpleMessageResponse(
+                    true,
+                    "Results released successfully."
+            );
+
+        } catch (Exception e) {
+            long durationMs = System.currentTimeMillis() - start;
+
+            activityLogService.log(
+                    employeeId,
+                    role,
+                    "RESULTS",
+                    "RELEASE_RESULTS",
+                    "FAILED",
+                    "Failed to release results for exam ID " + examId + ": " + e.getMessage(),
+                    examId,
+                    null,
+                    null,
+                    durationMs
+            );
+
+            throw e;
+        }
+    }
+
+    private void backfillAttemptScoresBeforeRelease(Long examId) {
+
+        List<ExamAttempt> attempts =
+                attemptRepository.findByExamId(examId);
+
+        for (ExamAttempt attempt : attempts) {
+
+            BigDecimal totalScore =
+                    answerRepository.sumPointsAwardedByAttemptId(
+                            attempt.getAttemptId()
+                    );
+
+            BigDecimal totalPossible =
+                    questionRepository.sumTotalPointsByExamId(
+                            attempt.getExamId()
+                    );
+
+            if (totalScore == null) {
+                totalScore = BigDecimal.ZERO;
+            }
+
+            double percentage = 0.0;
+
+            if (totalPossible != null
+                    && totalPossible.compareTo(BigDecimal.ZERO) > 0) {
+
+                percentage = totalScore
+                        .divide(totalPossible, 4, RoundingMode.HALF_UP)
+                        .multiply(BigDecimal.valueOf(100))
+                        .doubleValue();
+            }
+
+            attempt.setTotalScore(totalScore.doubleValue());
+            attempt.setScorePercentage(percentage);
+
+            boolean needsReview =
+                    answerRepository.existsPendingReviewByAttemptId(
+                            attempt.getAttemptId()
+                    );
+
+            if (!needsReview
+                    && !"REVIEWED".equalsIgnoreCase(attempt.getReviewStatus())) {
+                attempt.setReviewStatus("REVIEWED");
+                attempt.setReviewedBy("SYSTEM");
+                attempt.setReviewedAt(OffsetDateTime.now());
+            }
+
+            attemptRepository.save(attempt);
+        }
+    }
+
 
     private Map<String, ClassOfferingMeta> buildClassOfferingMetaMap(Set<String> classOfferingIds) {
 

@@ -8,10 +8,16 @@ import com.example.backend.dto.faculty.response.AnswerReviewTimelineDTO;
 import com.example.backend.dto.faculty.response.FacultyAttemptReviewResponse;
 import com.example.backend.dto.faculty.response.FacultyExamDetailResponse;
 import com.example.backend.dto.faculty.response.SimpleMessageResponse;
+import com.example.backend.entity.cache.ClassOfferingCache;
+import com.example.backend.entity.cache.StudentProfileCache;
+import com.example.backend.entity.enums.ExamStatus;
 import com.example.backend.entity.exam.*;
+import com.example.backend.repository.cache.ClassEnrollmentCacheRepository;
 import com.example.backend.repository.exam.*;
+import com.example.backend.service.core.EmailService;
 import com.example.backend.service.core.SystemActivityLogService;
 import jakarta.transaction.Transactional;
+import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -21,6 +27,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
+@AllArgsConstructor
 public class ExamWorkspaceService {
 
     private final ExamRepository examRepository;
@@ -32,26 +39,8 @@ public class ExamWorkspaceService {
     private final SystemActivityLogService activityLogService;
     private final ExamWorkspaceRepository examWorkspaceRepository;
     private final ExamAnswerReviewLogRepository reviewLogRepository;
-
-    public ExamWorkspaceService(ExamRepository examRepository,
-                                ExamQuestionRepository examQuestionRepository,
-                                ExamAnswerRepository examAnswerRepository,
-                                ExamAttemptRepository examAttemptRepository,
-                                EssayRubricRepository essayRubricRepository,
-                                EssayRubricScoreRepository rubricScoreRepository,
-                                SystemActivityLogService activityLogService,
-                                ExamWorkspaceRepository examWorkspaceRepository,
-                                ExamAnswerReviewLogRepository reviewLogRepository) {
-        this.examRepository = examRepository;
-        this.examQuestionRepository = examQuestionRepository;
-        this.examAnswerRepository = examAnswerRepository;
-        this.examAttemptRepository = examAttemptRepository;
-        this.essayRubricRepository = essayRubricRepository;
-        this.rubricScoreRepository = rubricScoreRepository;
-        this.activityLogService = activityLogService;
-        this.examWorkspaceRepository = examWorkspaceRepository;
-        this.reviewLogRepository = reviewLogRepository;
-    }
+    private final EmailService emailService;
+    private final ClassOfferingCache classOfferingCacheRepository;
 
     @TrackActivity(
             module = "FACULTY",
@@ -667,93 +656,6 @@ public class ExamWorkspaceService {
         return leaderboard;
     }
 
-    @Transactional
-    public SimpleMessageResponse releaseExamResults(
-            Long examId,
-            String employeeId,
-            String role
-    ) {
-        long start = System.currentTimeMillis();
-
-        try {
-            validateRole(role);
-
-            if (!examWorkspaceRepository.canAccessExam(examId, employeeId, role)) {
-                throw new RuntimeException("Exam not found or access denied.");
-            }
-
-            Exam exam = examRepository.findById(examId)
-                    .orElseThrow(() ->
-                            new RuntimeException("Exam not found.")
-                    );
-
-            if (Boolean.TRUE.equals(exam.getResultsReleased())) {
-                long durationMs = System.currentTimeMillis() - start;
-
-                activityLogService.log(
-                        employeeId,
-                        role,
-                        "RESULTS",
-                        "RELEASE_RESULTS",
-                        "FAILED",
-                        "Results already released for exam ID " + examId + ".",
-                        examId,
-                        null,
-                        null,
-                        durationMs
-                );
-
-                return new SimpleMessageResponse(
-                        false,
-                        "Results are already released."
-                );
-            }
-
-            backfillAttemptScoresBeforeRelease(examId);
-            exam.setResultsReleased(true);
-            exam.setResultsReleasedAt(OffsetDateTime.now());
-            examRepository.save(exam);
-
-            long durationMs = System.currentTimeMillis() - start;
-
-            activityLogService.log(
-                    employeeId,
-                    role,
-                    "RESULTS",
-                    "RELEASE_RESULTS",
-                    "SUCCESS",
-                    "Released results for exam: " + exam.getTitle(),
-                    examId,
-                    null,
-                    null,
-                    durationMs
-            );
-
-            return new SimpleMessageResponse(
-                    true,
-                    "Results released successfully."
-            );
-
-        } catch (Exception e) {
-            long durationMs = System.currentTimeMillis() - start;
-
-            activityLogService.log(
-                    employeeId,
-                    role,
-                    "RESULTS",
-                    "RELEASE_RESULTS",
-                    "FAILED",
-                    "Failed to release results for exam ID " + examId + ": " + e.getMessage(),
-                    examId,
-                    null,
-                    null,
-                    durationMs
-            );
-
-            throw e;
-        }
-    }
-
     @TrackActivity(
             module = "EXAM_WORKSPACE",
             action = "GET_ACTIVITY_LOGS"
@@ -813,57 +715,6 @@ public class ExamWorkspaceService {
             throw new RuntimeException(
                     "Only faculty or admin users can access this resource."
             );
-        }
-    }
-
-    private void backfillAttemptScoresBeforeRelease(Long examId) {
-
-        List<ExamAttempt> attempts =
-                examAttemptRepository.findByExamId(examId);
-
-        for (ExamAttempt attempt : attempts) {
-
-            BigDecimal totalScore =
-                    examAnswerRepository.sumPointsAwardedByAttemptId(
-                            attempt.getAttemptId()
-                    );
-
-            BigDecimal totalPossible =
-                    examQuestionRepository.sumTotalPointsByExamId(
-                            attempt.getExamId()
-                    );
-
-            if (totalScore == null) {
-                totalScore = BigDecimal.ZERO;
-            }
-
-            double percentage = 0.0;
-
-            if (totalPossible != null
-                    && totalPossible.compareTo(BigDecimal.ZERO) > 0) {
-
-                percentage = totalScore
-                        .divide(totalPossible, 4, RoundingMode.HALF_UP)
-                        .multiply(BigDecimal.valueOf(100))
-                        .doubleValue();
-            }
-
-            attempt.setTotalScore(totalScore.doubleValue());
-            attempt.setScorePercentage(percentage);
-
-            boolean needsReview =
-                    examAnswerRepository.existsPendingReviewByAttemptId(
-                            attempt.getAttemptId()
-                    );
-
-            if (!needsReview
-                    && !"REVIEWED".equalsIgnoreCase(attempt.getReviewStatus())) {
-                attempt.setReviewStatus("REVIEWED");
-                attempt.setReviewedBy("SYSTEM");
-                attempt.setReviewedAt(OffsetDateTime.now());
-            }
-
-            examAttemptRepository.save(attempt);
         }
     }
 
