@@ -1,71 +1,45 @@
 package com.example.backend.service.core;
 
-import jakarta.mail.internet.MimeMessage;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
+import lombok.AllArgsConstructor;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-
 @Service
+@AllArgsConstructor
 public class EmailService {
 
-    private final JavaMailSender mailSender;
-
-    @Value("${app.mail.from:${spring.mail.username}}")
-    private String fromEmail;
-
-    public EmailService(JavaMailSender mailSender) {
-        this.mailSender = mailSender;
-    }
+    private final BrevoEmailClient brevoEmailClient;
 
     public void sendActivationEmail(String toEmail, String username, String tempPassword) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, "UTF-8");
-
-            helper.setFrom(fromEmail, "ExamGuard System");
-            helper.setTo(toEmail);
-            helper.setSubject("ExamGuard Account Activation");
-
             String html = buildActivationHtml(username, tempPassword);
-            helper.setText(html, true);
 
-            mailSender.send(message);
+            brevoEmailClient.sendHtmlEmail(
+                    toEmail,
+                    "ExamGuard Account Activation",
+                    html
+            );
 
         } catch (Exception e) {
-        e.printStackTrace();
+            e.printStackTrace();
 
-        Throwable root = e;
-        while (root.getCause() != null) {
-            root = root.getCause();
+            throw new RuntimeException(
+                    "Failed to send activation email. Root cause: " + e.getMessage(),
+                    e
+            );
         }
-
-        System.out.println("EMAIL ROOT ERROR: " + root.getClass().getName());
-        System.out.println("EMAIL ROOT MESSAGE: " + root.getMessage());
-
-        throw new RuntimeException(
-                "Failed to send activation email. Root cause: " + root.getMessage(),
-                e
-        );
-    }
     }
 
     public void sendResetPasswordEmail(String toEmail, String username, String tempPassword) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, "UTF-8");
-
-            helper.setFrom(fromEmail, "ExamGuard Security");
-            helper.setTo(toEmail);
-            helper.setSubject("ExamGuard Password Reset");
 
             String html = buildResetPasswordHtml(username, tempPassword);
-            helper.setText(html, true);
 
-            mailSender.send(message);
+            brevoEmailClient.sendHtmlEmail(
+                    toEmail,
+                    "ExamGuard Password Reset",
+                    html
+            );
 
         } catch (Exception e) {
             throw new RuntimeException("Failed to send reset password email.", e);
@@ -81,12 +55,6 @@ public class EmailService {
                                        String endDateTime,
                                        int durationMinutes) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, "UTF-8");
-
-            helper.setFrom(fromEmail, "ExamGuard System");
-            helper.setTo(toEmail);
-            helper.setSubject("New Exam Available | " + examTitle + " | " + courseCode);
 
             String html = buildExamPublishedHtml(
                     studentName,
@@ -97,8 +65,11 @@ public class EmailService {
                     durationMinutes
             );
 
-            helper.setText(html, true);
-            mailSender.send(message);
+            brevoEmailClient.sendHtmlEmail(
+                    toEmail,
+                    "New Exam Available | " + examTitle + " | " + courseCode,
+                    html
+            );
 
         } catch (Exception e) {
             throw new RuntimeException("Failed to send exam published email.", e);
@@ -111,51 +82,18 @@ public class EmailService {
                                        String examTitle,
                                        String courseCode) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, "UTF-8");
-
-            helper.setFrom(fromEmail, "ExamGuard System");
-            helper.setTo(toEmail);
-            helper.setSubject("Exam Cancelled | " + examTitle + " | " + courseCode);
 
             String html = buildExamCancelledHtml(studentName, examTitle, courseCode);
 
-            helper.setText(html, true);
-            mailSender.send(message);
+            brevoEmailClient.sendHtmlEmail(
+                    toEmail,
+                    "Exam Cancelled | " + examTitle + " | " + courseCode,
+                    html
+            );
+
 
         } catch (Exception e) {
             throw new RuntimeException("Failed to send exam cancelled email.", e);
-        }
-    }
-
-    @Async
-    public void sendExamRescheduledEmail(String toEmail,
-                                         String studentName,
-                                         String examTitle,
-                                         String courseCode,
-                                         String newStartDateTime,
-                                         String newEndDateTime) {
-        try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, "UTF-8");
-
-            helper.setFrom(fromEmail, "ExamGuard System");
-            helper.setTo(toEmail);
-            helper.setSubject("Exam Rescheduled | " + examTitle + " | " + courseCode);
-
-            String html = buildExamRescheduledHtml(
-                    studentName,
-                    examTitle,
-                    courseCode,
-                    newStartDateTime,
-                    newEndDateTime
-            );
-
-            helper.setText(html, true);
-            mailSender.send(message);
-
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to send exam rescheduled email.", e);
         }
     }
 
@@ -165,66 +103,18 @@ public class EmailService {
                                              String examTitle,
                                              String courseCode) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, "UTF-8");
-
-            helper.setFrom(fromEmail, "ExamGuard System");
-            helper.setTo(toEmail);
-            helper.setSubject("Exam Results Released | " + examTitle + " | " + courseCode);
 
             String html = buildExamResultsReleasedHtml(studentName, examTitle, courseCode);
 
-            helper.setText(html, true);
-            mailSender.send(message);
+
+            brevoEmailClient.sendHtmlEmail(
+                    toEmail,
+                    "Exam Results Released | " + examTitle + " | " + courseCode,
+                    html
+            );
 
         } catch (Exception e) {
             throw new RuntimeException("Failed to send exam results released email.", e);
-        }
-    }
-
-    @Async
-    public void sendBulkExamPublishedEmail(List<String> emails,
-                                           String examTitle,
-                                           String courseCode,
-                                           String start,
-                                           String end,
-                                           int duration) {
-
-        try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, "UTF-8");
-
-            helper.setFrom(fromEmail, "ExamGuard System");
-
-            // primary recipient (required)
-            helper.setTo(fromEmail);
-
-            // BCC all students
-            helper.setBcc(emails.toArray(new String[0]));
-
-            helper.setSubject(
-                    "New Exam Available | " + examTitle + " | " + courseCode
-            );
-
-            String html = """
-                <h2>New Exam Available</h2>
-                <p>A new exam has been published.</p>
-
-                <b>Exam:</b> %s<br>
-                <b>Course:</b> %s<br>
-                <b>Start:</b> %s<br>
-                <b>End:</b> %s<br>
-                <b>Duration:</b> %d minutes<br><br>
-
-                <p>Please login to ExamGuard.</p>
-                """.formatted(examTitle, courseCode, start, end, duration);
-
-            helper.setText(html, true);
-
-            mailSender.send(message);
-
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to send bulk email", e);
         }
     }
 
