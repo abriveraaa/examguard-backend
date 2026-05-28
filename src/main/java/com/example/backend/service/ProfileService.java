@@ -24,6 +24,8 @@ import net.coobird.thumbnailator.Thumbnails;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.nio.file.Path;
 import java.time.OffsetDateTime;
@@ -161,84 +163,93 @@ public class ProfileService {
             MultipartFile file
     ) {
 
+        final long MAX_IMAGE_SIZE = 1_000_000; // 1MB
+
         if (file == null || file.isEmpty()) {
-            return new ImageUploadResponse(
-                    false,
-                    "Image file is empty.",
-                    null
-            );
+            return new ImageUploadResponse(false, "Image file is empty.", null);
         }
 
         String contentType = file.getContentType();
 
         if (contentType == null || !contentType.startsWith("image/")) {
-
-            return new ImageUploadResponse(
-                    false,
-                    "Only image files are allowed.",
-                    null
-            );
+            return new ImageUploadResponse(false, "Only image files are allowed.", null);
         }
 
         try {
 
             UserAccess user = findUser(userId);
 
-            String uploadDir =
-                    System.getProperty("user.dir") + "/uploads/profiles/";
+            String uploadDir = System.getProperty("user.dir") + "/uploads/profiles/";
 
             File directory = new File(uploadDir);
 
             if (!directory.exists()) {
-
                 boolean created = directory.mkdirs();
 
                 if (!created) {
-
-                    return new ImageUploadResponse(
-                            false,
-                            "Failed to create upload directory.",
-                            null
-                    );
+                    return new ImageUploadResponse(false, "Failed to create upload directory.", null);
                 }
-            }
-
-            String originalFilename =
-                    file.getOriginalFilename();
-
-            String extension = ".jpg";
-
-            if (originalFilename != null &&
-                    originalFilename.contains(".")) {
-
-                extension =
-                        originalFilename.substring(
-                                originalFilename.lastIndexOf(".")
-                        );
             }
 
             String safeSchoolId = user.getSchoolId().replaceAll("[^a-zA-Z0-9_-]", "");
 
-            String filename = safeSchoolId + "-" + UUID.randomUUID() + extension;
+            String filename = safeSchoolId + "-" + UUID.randomUUID() + ".jpg";
 
-            File destination = new File(directory,filename);
+            File destination = new File(directory, filename);
 
-            Thumbnails.of(file.getInputStream())
-                    .size(1000,1000)
-                    .outputQuality(.85)
-                    .toFile(destination);
+            BufferedImage originalImage = ImageIO.read(file.getInputStream());
 
-            String imageUrl =
-                    "/uploads/profiles/"
-                            + filename;
+            if (originalImage == null) {
+                return new ImageUploadResponse(false, "Invalid image file.", null);
+            }
 
-            user.setProfileImageUrl(
-                    imageUrl
-            );
+            double quality = 0.90;
+            boolean compressedSuccessfully = false;
 
-            userAccessRepository.save(
-                    user
-            );
+            while (quality >= 0.10) {
+
+                Thumbnails.of(originalImage)
+                        .size(1000, 1000)
+                        .outputFormat("jpg")
+                        .outputQuality(quality)
+                        .toFile(destination);
+
+                if (destination.length() <= MAX_IMAGE_SIZE) {
+                    compressedSuccessfully = true;
+                    break;
+                }
+
+                quality -= 0.10;
+            }
+
+            if (!compressedSuccessfully) {
+                if (destination.exists()) {
+                    destination.delete();
+                }
+
+                return new ImageUploadResponse(
+                        false,
+                        "Unable to compress image below 1MB.",
+                        null
+                );
+            }
+
+            String imageUrl = "/uploads/profiles/" + filename;
+
+            String oldImageUrl = user.getProfileImageUrl();
+
+            user.setProfileImageUrl(imageUrl);
+
+            userAccessRepository.save(user);
+
+            if (oldImageUrl != null && !oldImageUrl.isBlank()) {
+
+                String oldFilename = oldImageUrl.replace("/uploads/profiles/", "");
+
+                File oldFile = new File(directory, oldFilename);
+
+                if (oldFile.exists()) {oldFile.delete();}
+            }
 
             return new ImageUploadResponse(
                     true,

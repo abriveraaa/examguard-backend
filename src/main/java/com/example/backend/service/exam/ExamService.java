@@ -33,6 +33,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.math.RoundingMode;
 import java.time.ZoneOffset;
@@ -1633,51 +1635,99 @@ public class ExamService {
     }
 
     public ImageUploadResponse uploadExamImage(MultipartFile file) {
+
         if (file == null || file.isEmpty()) {
-            return new ImageUploadResponse(false, "Image file is empty.", null);
+            return new ImageUploadResponse(
+                    false,
+                    "Image file is empty.",
+                    null
+            );
         }
 
         String contentType = file.getContentType();
 
         if (contentType == null || !contentType.startsWith("image/")) {
-            return new ImageUploadResponse(false, "Only image files are allowed.", null);
+            return new ImageUploadResponse(
+                    false,
+                    "Only image files are allowed.",
+                    null
+            );
         }
 
         try {
-            String uploadDir = System.getProperty("user.dir") + "/uploads/exams/";
+
+            String uploadDir =
+                    System.getProperty("user.dir")
+                            + "/uploads/exams/";
 
             File directory = new File(uploadDir);
 
             if (!directory.exists()) {
                 boolean created = directory.mkdirs();
+
                 if (!created) {
-                    return new ImageUploadResponse(false, "Failed to create upload directory.", null);
+                    return new ImageUploadResponse(
+                            false,
+                            "Failed to create upload directory.",
+                            null
+                    );
                 }
             }
 
-            String originalFilename = file.getOriginalFilename();
-            String extension = "";
-
-            if (originalFilename != null && originalFilename.contains(".")) {
-                extension = originalFilename.substring(originalFilename.lastIndexOf("."));
-            }
-
-            String filename = UUID.randomUUID() + extension;
+            String filename = UUID.randomUUID() + ".jpg";
 
             File destination = new File(directory, filename);
 
-            Thumbnails.of(file.getInputStream())
-                    .size(1200, 1200)
-                    .outputQuality(0.85)
-                    .toFile(destination);
+            BufferedImage originalImage = ImageIO.read(file.getInputStream());
 
-            String imageUrl = "/uploads/exams/" + filename;
+            double quality = 0.9;
 
-            return new ImageUploadResponse(true, "Image uploaded successfully.", imageUrl);
+            boolean success = false;
+
+            while (quality >= 0.1) {
+
+                Thumbnails.of(originalImage)
+                        .size(1200, 1200)
+                        .outputFormat("jpg")
+                        .outputQuality(quality)
+                        .toFile(destination);
+
+                long fileSize = destination.length();
+
+                if (fileSize <= 1_000_000) {
+                    success = true;
+                    break;
+                }
+
+                quality -= 0.1;
+            }
+
+            if (!success) {
+                return new ImageUploadResponse(
+                        false,
+                        "Unable to compress image below 1MB.",
+                        null
+                );
+            }
+
+            String imageUrl =
+                    "/uploads/exams/" + filename;
+
+            return new ImageUploadResponse(
+                    true,
+                    "Image uploaded successfully.",
+                    imageUrl
+            );
 
         } catch (Exception e) {
+
             e.printStackTrace();
-            return new ImageUploadResponse(false, "Failed to save image.", null);
+
+            return new ImageUploadResponse(
+                    false,
+                    "Failed to save image.",
+                    null
+            );
         }
     }
 
@@ -2481,16 +2531,10 @@ public class ExamService {
     ) {
 
         List<ExamQuestion> existingQuestions =
-                questionRepository.findByExamExamIdOrderByQuestionOrderAsc(
-                        exam.getExamId()
-                );
+                questionRepository.findByExamExamIdOrderByQuestionOrderAsc(exam.getExamId());
 
         Map<Long, ExamQuestion> existingMap =
-                existingQuestions.stream()
-                        .collect(Collectors.toMap(
-                                ExamQuestion::getQuestionId,
-                                q -> q
-                        ));
+                existingQuestions.stream().collect(Collectors.toMap(ExamQuestion::getQuestionId, q -> q));
 
         Set<Long> incomingIds = requests.stream()
                 .map(QuestionRequest::getQuestionId)
@@ -2510,6 +2554,8 @@ public class ExamService {
                             "Cannot delete question with student attempts."
                     );
                 }
+
+                deleteExamImageIfExists(existing.getQuestionImageUrl());
 
                 questionRepository.delete(existing);
             }
@@ -2541,7 +2587,18 @@ public class ExamService {
             );
 
             question.setQuestionText(request.getQuestionText());
-            question.setQuestionImageUrl(request.getQuestionImageUrl());
+
+            String oldImageUrl = question.getQuestionImageUrl();
+            String newImageUrl = request.getQuestionImageUrl();
+
+            boolean imageChanged =
+                    oldImageUrl != null && !oldImageUrl.isBlank() && !Objects.equals(oldImageUrl, newImageUrl);
+
+            if (imageChanged) {
+                deleteExamImageIfExists(oldImageUrl);
+            }
+
+            question.setQuestionImageUrl(newImageUrl);
             question.setPoints(request.getPoints());
             question.setCorrectAnswer(request.getCorrectAnswer());
             question.setQuestionInstruction(request.getQuestionInstruction());
@@ -2565,26 +2622,30 @@ public class ExamService {
         }
 
         List<ExamChoice> existingChoices =
-                choiceRepository
-                        .findByQuestionQuestionIdOrderByChoiceOrderAsc(
-                                question.getQuestionId()
-                        );
+                choiceRepository.findByQuestionQuestionIdOrderByChoiceOrderAsc(
+                        question.getQuestionId()
+                );
 
         Map<Long, ExamChoice> existingMap =
-                existingChoices.stream()
+                existingChoices
+                        .stream()
                         .collect(Collectors.toMap(
                                 ExamChoice::getChoiceId,
                                 c -> c
                         ));
 
-        Set<Long> incomingIds = requests.stream()
-                .map(ChoiceRequest::getChoiceId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
+        Set<Long> incomingIds =
+                requests
+                        .stream()
+                        .map(ChoiceRequest::getChoiceId)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toSet());
 
         for (ExamChoice existing : existingChoices) {
 
             if (!incomingIds.contains(existing.getChoiceId())) {
+
+                deleteExamImageIfExists(existing.getChoiceImageUrl());
 
                 choiceRepository.delete(existing);
             }
@@ -2596,8 +2657,7 @@ public class ExamService {
 
             ExamChoice choice;
 
-            if (request.getChoiceId() != null
-                    && existingMap.containsKey(request.getChoiceId())) {
+            if (request.getChoiceId() != null && existingMap.containsKey(request.getChoiceId())) {
 
                 choice = existingMap.get(request.getChoiceId());
 
@@ -2607,9 +2667,19 @@ public class ExamService {
                 choice.setQuestion(question);
             }
 
+            String oldImageUrl = choice.getChoiceImageUrl();
+            String newImageUrl = request.getChoiceImageUrl();
+
+            boolean imageChanged =
+                    oldImageUrl != null && !oldImageUrl.isBlank() && !Objects.equals(oldImageUrl, newImageUrl);
+
+            if (imageChanged) {
+                deleteExamImageIfExists(oldImageUrl);
+            }
+
             choice.setChoiceLabel(request.getChoiceLabel());
             choice.setChoiceText(request.getChoiceText());
-            choice.setChoiceImageUrl(request.getChoiceImageUrl());
+            choice.setChoiceImageUrl(newImageUrl);
             choice.setCorrect(request.getCorrect());
             choice.setChoiceOrder(order++);
 
@@ -2671,6 +2741,25 @@ public class ExamService {
             rubric.setDisplayOrder(order++);
 
             essayRubricRepository.save(rubric);
+        }
+    }
+
+    private void deleteExamImageIfExists(String imageUrl) {
+
+        if (imageUrl == null || imageUrl.isBlank()) {
+            return;
+        }
+
+        if (!imageUrl.startsWith("/uploads/exams/")) {
+            return;
+        }
+
+        String filename = imageUrl.replace("/uploads/exams/", "");
+
+        File file = new File(System.getProperty("user.dir") + "/uploads/exams/", filename);
+
+        if (file.exists() && !file.delete()) {
+            System.out.println("Failed to delete exam image: " + file.getAbsolutePath());
         }
     }
 
