@@ -8,13 +8,8 @@ import com.example.backend.dto.faculty.response.AnswerReviewTimelineDTO;
 import com.example.backend.dto.faculty.response.FacultyAttemptReviewResponse;
 import com.example.backend.dto.faculty.response.FacultyExamDetailResponse;
 import com.example.backend.dto.faculty.response.SimpleMessageResponse;
-import com.example.backend.entity.cache.ClassOfferingCache;
-import com.example.backend.entity.cache.StudentProfileCache;
-import com.example.backend.entity.enums.ExamStatus;
 import com.example.backend.entity.exam.*;
-import com.example.backend.repository.cache.ClassEnrollmentCacheRepository;
 import com.example.backend.repository.exam.*;
-import com.example.backend.service.core.EmailService;
 import com.example.backend.service.core.SystemActivityLogService;
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
@@ -30,7 +25,6 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 public class ExamWorkspaceService {
 
-    private final ExamRepository examRepository;
     private final ExamQuestionRepository examQuestionRepository;
     private final ExamAnswerRepository examAnswerRepository;
     private final ExamAttemptRepository examAttemptRepository;
@@ -39,8 +33,6 @@ public class ExamWorkspaceService {
     private final SystemActivityLogService activityLogService;
     private final ExamWorkspaceRepository examWorkspaceRepository;
     private final ExamAnswerReviewLogRepository reviewLogRepository;
-    private final EmailService emailService;
-    private final ClassOfferingCache classOfferingCacheRepository;
 
     @TrackActivity(
             module = "FACULTY",
