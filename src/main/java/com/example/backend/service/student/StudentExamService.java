@@ -1,5 +1,6 @@
 package com.example.backend.service.student;
 
+import com.example.backend.audit.TrackActivity;
 import com.example.backend.dto.student.StudentExamCardDTO;
 import com.example.backend.entity.enums.ExamMode;
 import com.example.backend.repository.core.StudentExamRepository;
@@ -15,6 +16,11 @@ public class StudentExamService {
 
     private final StudentExamRepository studentExamRepository;
 
+    @TrackActivity(
+            module = "STUDENT_EXAMS",
+            action = "VIEW_EXAM_CARDS",
+            message = "Student viewed exam cards"
+    )
     public List<StudentExamCardDTO> getStudentExamCards(String studentId) {
 
         OffsetDateTime now = OffsetDateTime.now();

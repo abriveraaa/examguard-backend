@@ -59,7 +59,6 @@ public class ExamController {
     private final ExamWorkspaceService examWorkspaceService;
     private final ExamTemplateService examTemplateService;
     private final ReportExportService reportExportService;
-    private final SystemActivityLogService activityLogService;
     private final AdminProfileRepository adminProfileRepository;
     private final FacultyProfileCacheRepository facultyProfileCacheRepository;
     private final StudentProfileCacheRepository studentProfileCacheRepository;
@@ -532,8 +531,6 @@ public class ExamController {
             @RequestHeader("Authorization") String authorization
     ) {
 
-        long start = System.currentTimeMillis();
-
         UserAccess user = authService.getUserFromSession(authorization);
 
         if (!"ADMIN".equalsIgnoreCase(user.getRole())
@@ -558,21 +555,6 @@ public class ExamController {
                 exportMode,
                 classOfferingId,
                 buildGeneratedByText(user.getSchoolId(), user.getRole())
-        );
-
-        long durationMs = System.currentTimeMillis() - start;
-
-        activityLogService.log(
-                user.getSchoolId(),
-                user.getRole(),
-                "REPORTS",
-                "GENERATE_EXAM_PORTFOLIO",
-                "SUCCESS",
-                "Generated exam portfolio report. Mode: " + exportMode,
-                examId,
-                null,
-                null,
-                durationMs
         );
 
         return ResponseEntity.ok()

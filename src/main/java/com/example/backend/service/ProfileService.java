@@ -1,5 +1,6 @@
 package com.example.backend.service;
 
+import com.example.backend.audit.TrackActivity;
 import com.example.backend.dto.core.CurrentTermDTO;
 import com.example.backend.dto.exam.response.ImageUploadResponse;
 import com.example.backend.dto.profile.ProfileActivityDTO;
@@ -51,7 +52,8 @@ public class ProfileService {
     private final ClassOfferingCacheRepository classOfferingCacheRepository;
     private final SystemActivityLogRepository systemActivityLogRepository;
 
-    private static final Path PROFILE_UPLOAD_DIR = Path.of("uploads", "profiles");
+    private static final Path PROFILE_UPLOAD_DIR =
+            Path.of("uploads", "profiles");
 
     private static final ZoneId MANILA_ZONE = ZoneId.of("Asia/Manila");
 
@@ -61,6 +63,11 @@ public class ProfileService {
     private static final DateTimeFormatter ACTIVITY_FORMATTER =
             DateTimeFormatter.ofPattern("MMM dd, yyyy hh:mm a", Locale.ENGLISH);
 
+    @TrackActivity(
+            module = "PROFILE",
+            action = "VIEW_PROFILE",
+            message = "User viewed profile"
+    )
     public ProfileResponseDTO getMyProfile(
             String userId,
             String role
@@ -158,6 +165,11 @@ public class ProfileService {
         throw new RuntimeException("Unsupported role: " + role);
     }
 
+    @TrackActivity(
+            module = "PROFILE",
+            action = "UPLOAD_PROFILE_PHOTO",
+            message = "User uploaded profile photo"
+    )
     public ImageUploadResponse uploadProfilePhoto(
             String userId,
             MultipartFile file
@@ -179,15 +191,18 @@ public class ProfileService {
 
             UserAccess user = findUser(userId);
 
-            String uploadDir = System.getProperty("user.dir") + "/uploads/profiles/";
-
-            File directory = new File(uploadDir);
+            File directory = PROFILE_UPLOAD_DIR.toFile();
 
             if (!directory.exists()) {
+
                 boolean created = directory.mkdirs();
 
                 if (!created) {
-                    return new ImageUploadResponse(false, "Failed to create upload directory.", null);
+                    return new ImageUploadResponse(
+                            false,
+                            "Failed to create upload directory.",
+                            null
+                    );
                 }
             }
 

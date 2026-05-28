@@ -1,5 +1,8 @@
 package com.example.backend.service.faculty;
 
+import com.example.backend.audit.ActivityTarget;
+import com.example.backend.audit.ActivityTargetType;
+import com.example.backend.audit.TrackActivity;
 import com.example.backend.dto.faculty.reports.*;
 import com.example.backend.repository.report.FacultyReportsRepository;
 import com.example.backend.report.faculty.ClassRecordExportService;
@@ -31,12 +34,19 @@ public class FacultyReportsService {
     // EXAM RESULTS SUMMARY
     // ==================
 
+    @TrackActivity(
+            module = "FACULTY_REPORTS",
+            action = "VIEW_REPORT_SUMMARY",
+            message = "Faculty viewed report summary"
+    )
     public FacultyReportSummaryDTO getSummary(
             String facultyId,
             String academicYear,
             String term,
             String courseCode,
             String classOfferingId,
+
+            @ActivityTarget(ActivityTargetType.EXAM_ID)
             Long examId
     ) {
         String normalizedCourseCode = normalize(courseCode);
@@ -98,6 +108,11 @@ public class FacultyReportsService {
         );
     }
 
+    @TrackActivity(
+            module = "FACULTY_REPORTS",
+            action = "VIEW_PARTICIPATION_REPORT",
+            message = "Faculty viewed participation report"
+    )
     public List<ExamParticipationDTO> getParticipation(
             String facultyId,
             String academicYear,
@@ -114,12 +129,19 @@ public class FacultyReportsService {
         );
     }
 
+    @TrackActivity(
+            module = "FACULTY_REPORTS",
+            action = "VIEW_SUBMISSION_STATUS",
+            message = "Faculty viewed submission status report"
+    )
     public List<SubmissionStatusDTO> getSubmissionStatus(
             String facultyId,
             String academicYear,
             String term,
             String courseCode,
             String classOfferingId,
+
+            @ActivityTarget(ActivityTargetType.EXAM_ID)
             Long examId
     ) {
         return facultyReportsRepository.getSubmissionStatusRaw(
@@ -138,6 +160,11 @@ public class FacultyReportsService {
                 .toList();
     }
 
+    @TrackActivity(
+            module = "FACULTY_REPORTS",
+            action = "VIEW_SUBMISSION_BREAKDOWN",
+            message = "Faculty viewed submission breakdown report"
+    )
     public List<ExamSubmissionBreakdownDTO> getSubmissionBreakdown(
             String facultyId,
             String academicYear,
@@ -162,12 +189,19 @@ public class FacultyReportsService {
                 .toList();
     }
 
+    @TrackActivity(
+            module = "FACULTY_REPORTS",
+            action = "VIEW_VIOLATION_REPORT",
+            message = "Faculty viewed violation report"
+    )
     public List<ViolationTypeDTO> getViolations(
             String facultyId,
             String academicYear,
             String term,
             String courseCode,
             String classOfferingId,
+
+            @ActivityTarget(ActivityTargetType.EXAM_ID)
             Long examId
     ) {
         return facultyReportsRepository.getViolations(
@@ -180,6 +214,11 @@ public class FacultyReportsService {
         );
     }
 
+    @TrackActivity(
+            module = "FACULTY_REPORTS",
+            action = "VIEW_EXAM_OPTIONS",
+            message = "Faculty viewed exam report options"
+    )
     public List<ReportExamOptionDTO> getExamOptions(
             String facultyId,
             String academicYear,
@@ -200,8 +239,14 @@ public class FacultyReportsService {
     // CLASS RECORD
     // ==================
 
+    @TrackActivity(
+            module = "FACULTY_REPORTS",
+            action = "EXPORT_CLASS_RECORD_PDF",
+            message = "Faculty exported class record PDF"
+    )
     public byte[] exportClassRecordPdf(
             String facultyId,
+            @ActivityTarget(ActivityTargetType.CLASS_OFFERING_ID)
             String classOfferingId
     ) {
         String normalizedClassOfferingId = normalize(classOfferingId);

@@ -1,27 +1,17 @@
 package com.example.backend.service.faculty;
 
 import com.example.backend.audit.TrackActivity;
-import com.example.backend.dto.exam.request.EssayRubricRequest;
-import com.example.backend.dto.exam.response.EssayRubricScoreResponse;
 import com.example.backend.dto.faculty.*;
-import com.example.backend.dto.faculty.response.FacultyAttemptReviewResponse;
 import com.example.backend.dto.faculty.response.FacultyDashboardResponse;
-import com.example.backend.dto.faculty.response.FacultyExamDetailResponse;
-import com.example.backend.dto.faculty.response.SimpleMessageResponse;
 import com.example.backend.entity.enums.ExamDisplayStatus;
 import com.example.backend.entity.enums.ExamStatus;
 import com.example.backend.entity.exam.*;
 import com.example.backend.repository.cache.ClassEnrollmentCacheRepository;
 import com.example.backend.repository.exam.*;
 import com.example.backend.repository.FacultyRepository;
-import com.example.backend.service.core.SystemActivityLogService;
 import com.example.backend.service.exam.ExamStatusService;
-import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.time.OffsetDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -50,8 +40,9 @@ public class FacultyService {
     // =========================================================
 
     @TrackActivity(
-            module = "FACULTY",
-            action = "GET_DASHBOARD"
+            module = "FACULTY_DASHBOARD",
+            action = "VIEW_DASHBOARD",
+            message = "Faculty dashboard viewed"
     )
     public FacultyDashboardResponse getFacultyDashboard(
             String employeeId,
@@ -73,8 +64,9 @@ public class FacultyService {
 
 
     @TrackActivity(
-            module = "FACULTY",
-            action = "GET_DASHBOARD_PROFILE"
+            module = "FACULTY_DASHBOARD",
+            action = "VIEW_PROFILE_SUMMARY",
+            message = "Faculty dashboard profile viewed"
     )
     public FacultyProfileDTO getDashboardProfile(
             String employeeId,
@@ -86,8 +78,9 @@ public class FacultyService {
     }
 
     @TrackActivity(
-            module = "FACULTY",
-            action = "GET_DASHBOARD_ACTIVE_EXAMS"
+            module = "FACULTY_DASHBOARD",
+            action = "VIEW_ACTIVE_EXAMS",
+            message = "Faculty active exams viewed"
     )
     public List<FacultyExamSummaryDTO> getDashboardActiveExams(
             String employeeId,
@@ -146,8 +139,9 @@ public class FacultyService {
     }
 
     @TrackActivity(
-            module = "FACULTY",
-            action = "GET_DASHBOARD_RECENT_SUBMISSIONS"
+            module = "FACULTY_DASHBOARD",
+            action = "VIEW_RECENT_SUBMISSIONS",
+            message = "Faculty recent submissions viewed"
     )
     public List<FacultySubmissionSummaryDTO> getDashboardRecentSubmissions(
             String employeeId,
@@ -163,8 +157,9 @@ public class FacultyService {
     }
 
     @TrackActivity(
-            module = "FACULTY",
-            action = "GET_DASHBOARD_NEEDS_REVIEW"
+            module = "FACULTY_DASHBOARD",
+            action = "VIEW_NEEDS_REVIEW",
+            message = "Faculty needs-review list viewed"
     )
     public List<FacultyViolationReviewDTO> getDashboardNeedsReview(
             String employeeId,
@@ -180,8 +175,9 @@ public class FacultyService {
     }
 
     @TrackActivity(
-            module = "FACULTY",
-            action = "GET_DASHBOARD_STATS"
+            module = "FACULTY_DASHBOARD",
+            action = "VIEW_STATS",
+            message = "Faculty dashboard stats viewed"
     )
     public FacultyDashboardStatsDTO getDashboardStats(
             String employeeId,
@@ -216,8 +212,9 @@ public class FacultyService {
     // =========================================================
 
     @TrackActivity(
-            module = "FACULTY",
-            action = "GET_FACULTY_EXAMS"
+            module = "FACULTY_EXAMS",
+            action = "VIEW_EXAMS",
+            message = "Faculty exams viewed"
     )
     public List<FacultyExamSummaryDTO> getFacultyExams(
             String employeeId,
@@ -234,8 +231,9 @@ public class FacultyService {
     // =========================================================
 
     @TrackActivity(
-            module = "FACULTY",
-            action = "GET_FACULTY_CLASSES"
+            module = "FACULTY_CLASSES",
+            action = "VIEW_CLASSES",
+            message = "Faculty assigned classes viewed"
     )
     public List<FacultyClassDTO> getFacultyClasses(
             String employeeId,

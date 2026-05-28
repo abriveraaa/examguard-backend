@@ -1,5 +1,9 @@
 package com.example.backend.service.exam;
 
+import com.example.backend.audit.ActivityTarget;
+import com.example.backend.audit.ActivityContext;
+import com.example.backend.audit.ActivityTargetType;
+import com.example.backend.audit.TrackActivity;
 import com.example.backend.dto.exam.request.*;
 import com.example.backend.dto.exam.response.*;
 import com.example.backend.dto.exam.result.ExamResult;
@@ -7,7 +11,6 @@ import com.example.backend.dto.faculty.request.ViolationDecisionRequest;
 import com.example.backend.dto.exam.result.ExamTakingRawContent;
 import com.example.backend.dto.faculty.response.SimpleMessageResponse;
 import com.example.backend.entity.cache.ClassOfferingCache;
-import com.example.backend.entity.cache.FacultyLoadCache;
 import com.example.backend.entity.cache.FacultyProfileCache;
 import com.example.backend.entity.cache.StudentProfileCache;
 import com.example.backend.entity.core.AdminProfile;
@@ -17,7 +20,6 @@ import com.example.backend.entity.enums.QuestionType;
 import com.example.backend.entity.exam.*;
 import com.example.backend.repository.cache.StudentProfileCacheRepository;
 import com.example.backend.repository.exam.*;
-import com.example.backend.service.core.SystemActivityLogService;
 import com.example.backend.repository.cache.*;
 import com.example.backend.repository.core.AdminProfileRepository;
 import com.example.backend.entity.enums.ExamStatus;
@@ -77,7 +79,6 @@ public class ExamService {
     private final ExamAnswerRepository answerRepository;
     private final EssayRubricRepository essayRubricRepository;
     private final EssayRubricScoreRepository rubricScoreRepository;
-    private final SystemActivityLogService activityLogService;
     private final ExamAnswerReviewLogRepository reviewLogRepository;
     private final ClassEnrollmentCacheRepository classEnrollmentCacheRepository;
     private final ExamWorkspaceRepository examWorkspaceRepository;
@@ -95,20 +96,47 @@ public class ExamService {
     // ====================
     // DATABASE INTERACTION
     // ====================
+    @TrackActivity(
+            module = "EXAM",
+            action = "SAVE_DRAFT",
+            message = "Exam draft creation attempted"
+    )
     @Transactional
-    public ExamResult examDraft(ExamRequest request,
-                                String schoolId,
-                                String role) {
+    public ExamResult examDraft(
+            ExamRequest request,
+            String schoolId,
+            String role
+    ) {
         return createExam(request, schoolId, role, false);
     }
 
+    @TrackActivity(
+            module = "EXAM",
+            action = "CREATE_AND_PUBLISH",
+            message = "Exam creation and publish attempted"
+    )
     @Transactional
-    public ExamResult examPublish(ExamRequest request, String schoolId, String role) {
+    public ExamResult examPublish(
+            ExamRequest request,
+            String schoolId,
+            String role
+    ) {
         return createExam(request, schoolId, role, true);
     }
 
+    @TrackActivity(
+            module = "EXAM",
+            action = "UPDATE_EXAM",
+            message = "Exam update attempted"
+    )
     @Transactional
-    public ExamResult updateExam(Long examId, ExamRequest request, String schoolId, String role) {
+    public ExamResult updateExam(
+            @ActivityTarget(ActivityTargetType.EXAM_ID)
+            Long examId,
+            ExamRequest request,
+            String schoolId,
+            String role
+    ) {
 
         Exam exam = examRepository.findById(examId).orElse(null);
 
@@ -140,8 +168,18 @@ public class ExamService {
         );
     }
 
+    @TrackActivity(
+            module = "EXAM",
+            action = "PUBLISH_EXAM",
+            message = "Exam publish attempted"
+    )
     @Transactional
-    public ExamResult publishExamById(Long examId, String schoolId, String role) {
+    public ExamResult publishExamById(
+            @ActivityTarget(ActivityTargetType.EXAM_ID)
+            Long examId,
+            String schoolId,
+            String role
+    ) {
 
         Exam exam = examRepository.findById(examId).orElse(null);
 
@@ -268,23 +306,21 @@ public class ExamService {
             return new ExamResult(false, "Exam does not match attempt.", null, 0);
         }
 
-        activityLogService.logExamQuestionActivity(
-                studentId,
-                role,
-                request.getExamId(),
-                request.getAttemptId(),
-                request.getQuestionId(),
-                request.getAction(),
-                request.getMessage(),
-                request.getDurationMs(),
-                request.getMetadata()
-        );
-
         return new ExamResult(true, "Activity logged.", request.getExamId(), 1);
     }
 
+    @TrackActivity(
+            module = "EXAM",
+            action = "CANCEL_EXAM",
+            message = "Exam cancellation attempted"
+    )
     @Transactional
-    public ExamResult cancelExam(Long examId, String schoolId, String role) {
+    public ExamResult cancelExam(
+            @ActivityTarget(ActivityTargetType.EXAM_ID)
+            Long examId,
+            String schoolId,
+            String role
+    ) {
 
         Exam exam = examRepository.findById(examId)
                 .orElse(null);
@@ -319,8 +355,18 @@ public class ExamService {
         return new ExamResult(true, "Exam cancelled successfully.", examId, 0);
     }
 
+    @TrackActivity(
+            module = "EXAM",
+            action = "RESTORE_EXAM",
+            message = "Exam restore attempted"
+    )
     @Transactional
-    public ExamResult restoreExam(Long examId, String schoolId, String role) {
+    public ExamResult restoreExam(
+            @ActivityTarget(ActivityTargetType.EXAM_ID)
+            Long examId,
+            String schoolId,
+            String role
+    ) {
 
         Exam exam = examRepository.findById(examId)
                 .orElse(null);
@@ -343,6 +389,11 @@ public class ExamService {
         return new ExamResult(true, "Exam restored to draft successfully.", examId, 0);
     }
 
+    @TrackActivity(
+            module = "EXAM_REVIEW",
+            action = "SAVE_ESSAY_REVIEW",
+            message = "Essay review save attempted"
+    )
     @Transactional
     public ExamResult saveEssayReview(
             FacultyEssayReviewRequest request,
@@ -357,6 +408,11 @@ public class ExamService {
 
         ExamAnswer answer = answerRepository.findById(request.getAnswerId())
                 .orElseThrow(() -> new RuntimeException("Answer not found."));
+
+        ActivityContext.setTargetUserId(answer.getAttempt().getStudentId());
+        ActivityContext.setExamId(answer.getAttempt().getExamId());
+        ActivityContext.setAttemptId(answer.getAttempt().getAttemptId());
+        ActivityContext.setQuestionId(answer.getQuestion().getQuestionId());
 
         ExamQuestion question = answer.getQuestion();
 
@@ -439,8 +495,18 @@ public class ExamService {
         );
     }
 
+    @TrackActivity(
+            module = "EXAM",
+            action = "REPLACE_EXAM_TEMPLATE",
+            message = "Exam template replacement attempted"
+    )
     @Transactional
-    public ExamResult replaceUploadExamTemplate(Long examId, MultipartFile file) {
+    public ExamResult replaceUploadExamTemplate(
+            @ActivityTarget(ActivityTargetType.EXAM_ID)
+            Long examId,
+
+            MultipartFile file
+    ) {
 
         if (file == null || file.isEmpty()) {
             return new ExamResult(false, "File is empty.", null, 0);
@@ -479,6 +545,11 @@ public class ExamService {
         }
     }
 
+    @TrackActivity(
+            module = "EXAM_TAKING",
+            action = "SAVE_ANSWER",
+            message = "Student answer save attempted"
+    )
     @Transactional
     public ExamResult saveAnswer(
             SaveAnswerRequest request,
@@ -512,15 +583,19 @@ public class ExamService {
             return new ExamResult(false, "Question does not belong to this exam.", null, 0);
         }
 
+        ActivityContext.setTargetUserId(studentId);
+        ActivityContext.setExamId(attempt.getExamId());
+        ActivityContext.setAttemptId(attempt.getAttemptId());
+        ActivityContext.setQuestionId(question.getQuestionId());
+
         boolean hasViolation =
-                violationLogRepository
-                        .existsByAttemptAttemptIdAndQuestionQuestionId(
+                violationLogRepository.existsByAttemptAttemptIdAndQuestionQuestionId(
                                 attempt.getAttemptId(),
                                 question.getQuestionId()
                         );
 
-        ExamAnswer answer = answerRepository
-                .findByAttemptAttemptIdAndQuestionQuestionId(
+        ExamAnswer answer =
+                answerRepository.findByAttemptAttemptIdAndQuestionQuestionId(
                         request.getAttemptId(),
                         request.getQuestionId()
                 )
@@ -612,8 +687,17 @@ public class ExamService {
         );
     }
 
+    @TrackActivity(
+            module = "EXAM_TAKING",
+            action = "SUBMIT_EXAM",
+            message = "Student exam submission attempted"
+    )
     @Transactional
-    public ExamResult submitExam(Long attemptId, String studentId) {
+    public ExamResult submitExam(
+            @ActivityTarget(ActivityTargetType.ATTEMPT_ID)
+            Long attemptId,
+            String studentId
+    ) {
 
         ExamAttempt attempt = attemptRepository.findById(attemptId)
                 .orElse(null);
@@ -694,8 +778,14 @@ public class ExamService {
         ).trim();
     }
 
+    @TrackActivity(
+            module = "EXAM_TAKING",
+            action = "BEGIN_EXAM_ATTEMPT",
+            message = "Student began exam attempt"
+    )
     @Transactional
     public ExamTakingResponse beginExamAttempt(
+            @ActivityTarget(ActivityTargetType.EXAM_ID)
             Long examId,
             String schoolId,
             String role
@@ -831,6 +921,11 @@ public class ExamService {
         return response;
     }
 
+    @TrackActivity(
+            module = "EXAM_REVIEW",
+            action = "APPLY_VIOLATION_DECISION",
+            message = "Violation decision attempted"
+    )
     @Transactional
     public SimpleMessageResponse applyViolationDecision(
             ViolationDecisionRequest request,
@@ -842,9 +937,13 @@ public class ExamService {
         ExamAnswer answer = answerRepository.findById(request.getAnswerId())
                 .orElseThrow(() -> new RuntimeException("Answer not found."));
 
-        BigDecimal deduction = request.getDeduction() == null
-                ? BigDecimal.ZERO
-                : request.getDeduction();
+        ActivityContext.setTargetUserId(answer.getAttempt().getStudentId());
+        ActivityContext.setExamId(answer.getAttempt().getExamId());
+        ActivityContext.setAttemptId(answer.getAttempt().getAttemptId());
+        ActivityContext.setQuestionId(answer.getQuestion().getQuestionId());
+
+        BigDecimal deduction =
+                request.getDeduction() == null ? BigDecimal.ZERO : request.getDeduction();
 
         if (deduction.compareTo(BigDecimal.ZERO) < 0) {
             throw new RuntimeException("Deduction cannot be negative.");
@@ -1471,14 +1570,18 @@ public class ExamService {
         return response;
     }
 
-    @jakarta.transaction.Transactional
+    @TrackActivity(
+            module = "RESULTS",
+            action = "RELEASE_RESULTS",
+            message = "Exam results release attempted"
+    )
+    @Transactional
     public SimpleMessageResponse releaseExamResults(
+            @ActivityTarget(ActivityTargetType.EXAM_ID)
             Long examId,
             String employeeId,
             String role
     ) {
-        long start = System.currentTimeMillis();
-
         try {
             validateRole(role);
 
@@ -1492,20 +1595,6 @@ public class ExamService {
                     );
 
             if (Boolean.TRUE.equals(exam.getResultsReleased())) {
-                long durationMs = System.currentTimeMillis() - start;
-
-                activityLogService.log(
-                        employeeId,
-                        role,
-                        "RESULTS",
-                        "RELEASE_RESULTS",
-                        "FAILED",
-                        "Results already released for exam ID " + examId + ".",
-                        examId,
-                        null,
-                        null,
-                        durationMs
-                );
 
                 return new SimpleMessageResponse(
                         false,
@@ -1526,41 +1615,12 @@ public class ExamService {
 
             notifyStudents(savedExam, classOfferingIds, ExamStatus.RESULTS_RELEASED);
 
-            long durationMs = System.currentTimeMillis() - start;
-
-            activityLogService.log(
-                    employeeId,
-                    role,
-                    "RESULTS",
-                    "RELEASE_RESULTS",
-                    "SUCCESS",
-                    "Released results for exam: " + exam.getTitle(),
-                    examId,
-                    null,
-                    null,
-                    durationMs
-            );
-
             return new SimpleMessageResponse(
                     true,
                     "Results released successfully."
             );
 
         } catch (Exception e) {
-            long durationMs = System.currentTimeMillis() - start;
-
-            activityLogService.log(
-                    employeeId,
-                    role,
-                    "RESULTS",
-                    "RELEASE_RESULTS",
-                    "FAILED",
-                    "Failed to release results for exam ID " + examId + ": " + e.getMessage(),
-                    examId,
-                    null,
-                    null,
-                    durationMs
-            );
 
             throw e;
         }

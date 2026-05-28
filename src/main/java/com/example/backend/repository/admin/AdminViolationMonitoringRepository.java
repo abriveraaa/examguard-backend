@@ -113,15 +113,15 @@ public interface AdminViolationMonitoringRepository extends JpaRepository<ExamVi
       AND (:severity = 'All Severities' OR v.severity = :severity)
       AND (
             :search = ''
-            OR LOWER(COALESCE(a.student_id, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-            OR LOWER(COALESCE(v.violation_type, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-            OR LOWER(COALESCE(v.severity, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-            OR LOWER(COALESCE(v.review_status, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-            OR LOWER(COALESCE(v.violation_message, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-            OR LOWER(COALESCE(s.program_code, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-            OR LOWER(COALESCE(s.program_name, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-            OR LOWER(COALESCE(c.course_code, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-            OR LOWER(COALESCE(ex.title, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+            OR a.student_id LIKE CONCAT('%', :search, '%')
+            OR v.violation_type LIKE CONCAT('%', :search, '%')
+            OR v.severity LIKE CONCAT('%', :search, '%')
+            OR v.review_status LIKE CONCAT('%', :search, '%')
+            OR v.violation_message LIKE CONCAT('%', :search, '%')
+            OR s.program_code LIKE CONCAT('%', :search, '%')
+            OR s.program_name LIKE CONCAT('%', :search, '%')
+            OR c.course_code LIKE CONCAT('%', :search, '%')
+            OR ex.title LIKE CONCAT('%', :search, '%')
           )
     GROUP BY
         v.violation_id,

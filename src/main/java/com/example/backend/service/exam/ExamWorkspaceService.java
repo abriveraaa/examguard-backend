@@ -1,5 +1,7 @@
 package com.example.backend.service.exam;
 
+import com.example.backend.audit.ActivityTarget;
+import com.example.backend.audit.ActivityTargetType;
 import com.example.backend.audit.TrackActivity;
 import com.example.backend.dto.exam.request.EssayRubricRequest;
 import com.example.backend.dto.exam.response.EssayRubricScoreResponse;
@@ -30,15 +32,16 @@ public class ExamWorkspaceService {
     private final ExamAttemptRepository examAttemptRepository;
     private final EssayRubricRepository essayRubricRepository;
     private final EssayRubricScoreRepository rubricScoreRepository;
-    private final SystemActivityLogService activityLogService;
     private final ExamWorkspaceRepository examWorkspaceRepository;
     private final ExamAnswerReviewLogRepository reviewLogRepository;
 
     @TrackActivity(
-            module = "FACULTY",
-            action = "GET_FACULTY_EXAM_DETAIL"
+            module = "EXAM_WORKSPACE",
+            action = "GET_EXAM_DETAIL",
+            message = "Faculty/Admin viewed exam workspace detail"
     )
     public FacultyExamDetailResponse getExamDetail(
+            @ActivityTarget(ActivityTargetType.EXAM_ID)
             Long examId,
             String schoolId,
             String role
@@ -64,11 +67,22 @@ public class ExamWorkspaceService {
         return response;
     }
 
+    @TrackActivity(
+            module = "FACULTY_REVIEW",
+            action = "UPDATE_ANSWER_SCORE",
+            message = "Faculty/Admin updated answer score"
+    )
     @Transactional
     public SimpleMessageResponse updateAnswerScore(
+            @ActivityTarget(ActivityTargetType.QUESTION_ID)
             Long answerId,
+
             BigDecimal pointsAwarded,
+
+            @ActivityTarget(ActivityTargetType.TARGET_USER_ID)
             String employeeId,
+
+            @ActivityTarget(ActivityTargetType.TARGET_ROLE)
             String role
     ) {
         long start = System.currentTimeMillis();
@@ -81,25 +95,6 @@ public class ExamWorkspaceService {
 
             if (pointsAwarded == null) {
 
-                long durationMs = System.currentTimeMillis() - start;
-
-                activityLogService.log(
-                        employeeId,
-                        role,
-
-                        "FACULTY_REVIEW",
-                        "UPDATE_ANSWER_SCORE",
-
-                        "FAILED",
-                        "Points awarded is required.",
-
-                        null,
-                        null,
-                        null,
-
-                        durationMs
-                );
-
                 return new SimpleMessageResponse(
                         false,
                         "Points awarded is required."
@@ -107,25 +102,6 @@ public class ExamWorkspaceService {
             }
 
             if (pointsAwarded.compareTo(BigDecimal.ZERO) < 0) {
-
-                long durationMs = System.currentTimeMillis() - start;
-
-                activityLogService.log(
-                        employeeId,
-                        role,
-
-                        "FACULTY_REVIEW",
-                        "UPDATE_ANSWER_SCORE",
-
-                        "FAILED",
-                        "Negative score input for answer ID " + answerId,
-
-                        null,
-                        null,
-                        null,
-
-                        durationMs
-                );
 
                 return new SimpleMessageResponse(
                         false,
@@ -159,27 +135,6 @@ public class ExamWorkspaceService {
             }
 
             if (pointsAwarded.compareTo(maxPoints) > 0) {
-
-                long durationMs = System.currentTimeMillis() - start;
-
-                activityLogService.log(
-                        employeeId,
-                        role,
-
-                        "FACULTY_REVIEW",
-                        "UPDATE_ANSWER_SCORE",
-
-                        "FAILED",
-                        "Score " + pointsAwarded +
-                                " exceeds max " + maxPoints +
-                                " for answer ID " + answerId,
-
-                        attempt.getExamId(),
-                        attempt.getAttemptId(),
-                        answer.getQuestion().getQuestionId(),
-
-                        durationMs
-                );
 
                 return new SimpleMessageResponse(
                         false,
@@ -245,54 +200,12 @@ public class ExamWorkspaceService {
 
             examAttemptRepository.save(attempt);
 
-            long durationMs = System.currentTimeMillis() - start;
-
-            activityLogService.log(
-                    employeeId,
-                    role,
-
-                    "FACULTY_REVIEW",
-                    "UPDATE_ANSWER_SCORE",
-
-                    "SUCCESS",
-                    "Updated answer ID " + answerId +
-                            " to " + pointsAwarded + " points.",
-
-                    attempt.getExamId(),
-                    attempt.getAttemptId(),
-                    answer.getQuestion().getQuestionId(),
-
-                    durationMs
-            );
-
             return new SimpleMessageResponse(
                     true,
                     "Answer score updated successfully."
             );
 
         } catch (Exception e) {
-
-            long durationMs = System.currentTimeMillis() - start;
-
-            activityLogService.log(
-                    employeeId,
-                    role,
-
-                    "FACULTY_REVIEW",
-                    "UPDATE_ANSWER_SCORE",
-
-                    "FAILED",
-                    "Failed to update answer ID " + answerId +
-                            ": " + e.getMessage(),
-
-                    attempt == null ? null : attempt.getExamId(),
-                    attempt == null ? null : attempt.getAttemptId(),
-                    answer == null
-                            ? null
-                            : answer.getQuestion().getQuestionId(),
-
-                    durationMs
-            );
 
             throw e;
         }
@@ -303,12 +216,18 @@ public class ExamWorkspaceService {
     // =========================================================
 
     @TrackActivity(
-            module = "FACULTY",
-            action = "GET_EXAM_SUBMISSIONS"
+            module = "EXAM_WORKSPACE",
+            action = "GET_EXAM_SUBMISSIONS",
+            message = "Faculty/Admin viewed exam submissions"
     )
     public List<FacultySubmissionSummaryDTO> getExamSubmissions(
+            @ActivityTarget(ActivityTargetType.EXAM_ID)
             Long examId,
+
+            @ActivityTarget(ActivityTargetType.TARGET_USER_ID)
             String employeeId,
+
+            @ActivityTarget(ActivityTargetType.TARGET_ROLE)
             String role
     ) {
 
@@ -321,14 +240,22 @@ public class ExamWorkspaceService {
         );
     }
 
+    @TrackActivity(
+            module = "FACULTY_REVIEW",
+            action = "COMPLETE_REVIEW",
+            message = "Faculty/Admin marked attempt as reviewed"
+    )
     @Transactional
     public SimpleMessageResponse markAttemptReviewed(
+            @ActivityTarget(ActivityTargetType.ATTEMPT_ID)
             Long attemptId,
+
+            @ActivityTarget(ActivityTargetType.TARGET_USER_ID)
             String employeeId,
+
+            @ActivityTarget(ActivityTargetType.TARGET_ROLE)
             String role
     ) {
-        long start = System.currentTimeMillis();
-
         ExamAttempt attempt = null;
 
         try {
@@ -351,42 +278,12 @@ public class ExamWorkspaceService {
 
             examAttemptRepository.save(attempt);
 
-            long durationMs = System.currentTimeMillis() - start;
-
-            activityLogService.log(
-                    employeeId,
-                    role,
-                    "FACULTY_REVIEW",
-                    "COMPLETE_REVIEW",
-                    "SUCCESS",
-                    "Marked attempt as reviewed.",
-                    attempt.getExamId(),
-                    attempt.getAttemptId(),
-                    null,
-                    durationMs
-            );
-
             return new SimpleMessageResponse(
                     true,
                     "Attempt marked as reviewed."
             );
 
         } catch (Exception e) {
-            long durationMs = System.currentTimeMillis() - start;
-
-            activityLogService.log(
-                    employeeId,
-                    role,
-                    "FACULTY_REVIEW",
-                    "COMPLETE_REVIEW",
-                    "FAILED",
-                    "Failed to mark attempt ID " + attemptId + " as reviewed: " + e.getMessage(),
-                    attempt == null ? null : attempt.getExamId(),
-                    attempt == null ? attemptId : attempt.getAttemptId(),
-                    null,
-                    durationMs
-            );
-
             throw e;
         }
     }
@@ -396,12 +293,18 @@ public class ExamWorkspaceService {
     // =========================================================
 
     @TrackActivity(
-            module = "FACULTY",
-            action = "GET_EXAM_VIOLATIONS"
+            module = "EXAM_WORKSPACE",
+            action = "GET_EXAM_VIOLATIONS",
+            message = "Faculty/Admin viewed exam violations"
     )
     public List<FacultyStudentViolationDTO> getExamViolations(
+            @ActivityTarget(ActivityTargetType.EXAM_ID)
             Long examId,
+
+            @ActivityTarget(ActivityTargetType.TARGET_USER_ID)
             String employeeId,
+
+            @ActivityTarget(ActivityTargetType.TARGET_ROLE)
             String role
     ) {
 
@@ -418,9 +321,18 @@ public class ExamWorkspaceService {
     // TIMELINE
     // =========================================================
 
+    @TrackActivity(
+            module = "EXAM_REVIEW",
+            action = "GET_ANSWER_REVIEW_TIMELINE",
+            message = "Faculty/Admin viewed answer review timeline"
+    )
     public List<AnswerReviewTimelineDTO> getAnswerReviewTimeline(
             Long answerId,
+
+            @ActivityTarget(ActivityTargetType.TARGET_USER_ID)
             String employeeId,
+
+            @ActivityTarget(ActivityTargetType.TARGET_ROLE)
             String role
     ) {
         validateRole(role);
@@ -442,12 +354,18 @@ public class ExamWorkspaceService {
     // =========================================================
 
     @TrackActivity(
-            module = "FACULTY",
-            action = "GET_EXAM_STUDENTS"
+            module = "EXAM_WORKSPACE",
+            action = "GET_EXAM_STUDENTS",
+            message = "Faculty/Admin viewed exam students"
     )
     public List<FacultyExamStudentDTO> getExamStudents(
+            @ActivityTarget(ActivityTargetType.EXAM_ID)
             Long examId,
+
+            @ActivityTarget(ActivityTargetType.TARGET_USER_ID)
             String schoolId,
+
+            @ActivityTarget(ActivityTargetType.TARGET_ROLE)
             String role
     ) {
 
@@ -457,13 +375,20 @@ public class ExamWorkspaceService {
     }
 
     @TrackActivity(
-            module = "FACULTY",
-            action = "GET_STUDENT_ATTEMPT_REVIEW"
+            module = "EXAM_REVIEW",
+            action = "GET_STUDENT_ATTEMPT_REVIEW",
+            message = "Faculty/Admin viewed student attempt review"
     )
     public FacultyAttemptReviewResponse getStudentAttemptReview(
+            @ActivityTarget(ActivityTargetType.EXAM_ID)
             Long examId,
+
+            @ActivityTarget(ActivityTargetType.TARGET_USER_ID)
             String studentId,
+
             String employeeId,
+
+            @ActivityTarget(ActivityTargetType.TARGET_ROLE)
             String role
     ) {
         validateRole(role);
@@ -593,12 +518,18 @@ public class ExamWorkspaceService {
     // =========================================================
 
     @TrackActivity(
-            module = "FACULTY",
-            action = "GET_EXAM_LEADERBOARD"
+            module = "EXAM_WORKSPACE",
+            action = "GET_EXAM_LEADERBOARD",
+            message = "Faculty/Admin viewed exam leaderboard"
     )
     public List<FacultyLeaderboardDTO> getExamLeaderboard(
+            @ActivityTarget(ActivityTargetType.EXAM_ID)
             Long examId,
+
+            @ActivityTarget(ActivityTargetType.TARGET_USER_ID)
             String employeeId,
+
+            @ActivityTarget(ActivityTargetType.TARGET_ROLE)
             String role
     ) {
 
@@ -650,11 +581,17 @@ public class ExamWorkspaceService {
 
     @TrackActivity(
             module = "EXAM_WORKSPACE",
-            action = "GET_ACTIVITY_LOGS"
+            action = "GET_ACTIVITY_LOGS",
+            message = "Faculty/Admin viewed exam activity logs"
     )
     public List<FacultyActivityLogDTO> getExamActivityLogs(
+            @ActivityTarget(ActivityTargetType.EXAM_ID)
             Long examId,
+
+            @ActivityTarget(ActivityTargetType.TARGET_USER_ID)
             String employeeId,
+
+            @ActivityTarget(ActivityTargetType.TARGET_ROLE)
             String role
     ) {
         validateRole(role);

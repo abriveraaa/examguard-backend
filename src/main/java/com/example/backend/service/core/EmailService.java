@@ -8,13 +8,13 @@ import org.springframework.stereotype.Service;
 @AllArgsConstructor
 public class EmailService {
 
-    private final BrevoEmailClient brevoEmailClient;
+    private final EmailClient emailClient;
 
     public void sendActivationEmail(String toEmail, String username, String tempPassword) {
         try {
             String html = buildActivationHtml(username, tempPassword);
 
-            brevoEmailClient.sendHtmlEmail(
+            emailClient.sendHtmlEmail(
                     toEmail,
                     "ExamGuard Account Activation",
                     html
@@ -35,7 +35,7 @@ public class EmailService {
 
             String html = buildResetPasswordHtml(username, tempPassword);
 
-            brevoEmailClient.sendHtmlEmail(
+            emailClient.sendHtmlEmail(
                     toEmail,
                     "ExamGuard Password Reset",
                     html
@@ -65,7 +65,7 @@ public class EmailService {
                     durationMinutes
             );
 
-            brevoEmailClient.sendHtmlEmail(
+            emailClient.sendHtmlEmail(
                     toEmail,
                     "New Exam Available | " + examTitle + " | " + courseCode,
                     html
@@ -85,7 +85,7 @@ public class EmailService {
 
             String html = buildExamCancelledHtml(studentName, examTitle, courseCode);
 
-            brevoEmailClient.sendHtmlEmail(
+            emailClient.sendHtmlEmail(
                     toEmail,
                     "Exam Cancelled | " + examTitle + " | " + courseCode,
                     html
@@ -107,7 +107,7 @@ public class EmailService {
             String html = buildExamResultsReleasedHtml(studentName, examTitle, courseCode);
 
 
-            brevoEmailClient.sendHtmlEmail(
+            emailClient.sendHtmlEmail(
                     toEmail,
                     "Exam Results Released | " + examTitle + " | " + courseCode,
                     html

@@ -4,7 +4,7 @@ import com.example.backend.dto.admin.monitoring.*;
 import com.example.backend.entity.core.UserAccess;
 import com.example.backend.repository.admin.AdminMonitoringRepository;
 import com.example.backend.repository.admin.AdminViolationMonitoringRepository;
-import com.example.backend.entity.core.UserAccess;
+import com.example.backend.audit.TrackActivity;
 import com.example.backend.report.admin.MonitoringLogsExcelExporter;
 import com.example.backend.report.admin.MonitoringLogsPdfExporter;
 import com.example.backend.repository.core.*;
@@ -34,6 +34,11 @@ public class AdminMonitoringService {
 
     private static final ZoneId MANILA = ZoneId.of("Asia/Manila");
 
+    @TrackActivity(
+            module = "ADMIN_MONITORING",
+            action = "VIEW_OVERVIEW",
+            message = "Admin viewed monitoring overview"
+    )
     public MonitoringOverviewResponse getOverview(MonitoringFilterRequest filter) {
 
         ResolvedFilter resolved = resolveFilter(filter);
@@ -218,7 +223,7 @@ public class AdminMonitoringService {
                 monitoringRepository.recentAttentionSystemEvents(
                         resolved.startDate(),
                         resolved.endDate(),
-                        PageRequest.of(0, 10)
+                        PageRequest.of(0, 25)
                 )
         );
 
@@ -295,6 +300,11 @@ public class AdminMonitoringService {
     // =========
 
 
+    @TrackActivity(
+            module = "ADMIN_MONITORING",
+            action = "EXPORT_LOGS",
+            message = "Admin exported monitoring logs"
+    )
     public byte[] exportLogs(AdminMonitoringLogsRequest request, UserAccess user) {
         request.setPage(0);
         request.setSize(100000);

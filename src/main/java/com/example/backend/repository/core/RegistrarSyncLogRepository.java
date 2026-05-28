@@ -43,10 +43,10 @@ public interface RegistrarSyncLogRepository extends JpaRepository<RegistrarSyncL
           AND COALESCE(l.finishedAt, l.startedAt) <= :endDate
           AND (
                 :search = ''
-                OR LOWER(COALESCE(l.syncType, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-                OR LOWER(COALESCE(l.status, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-                OR LOWER(COALESCE(l.performedBy, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-                OR LOWER(COALESCE(l.message, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+                OR l.syncType LIKE CONCAT('%', :search, '%')
+                OR l.status LIKE CONCAT('%', :search, '%')
+                OR l.performedBy LIKE CONCAT('%', :search, '%')
+                OR l.message LIKE CONCAT('%', :search, '%')
               )
         ORDER BY COALESCE(l.finishedAt, l.startedAt) DESC
     """)

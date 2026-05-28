@@ -147,7 +147,7 @@ public interface ReportRepository extends Repository<Exam, Long> {
     FROM ExamAssignment ass
     JOIN ClassEnrollmentCache ce
         ON ce.classOfferingId = ass.classOfferingId
-        AND UPPER(ce.status) = 'ENROLLED'
+        AND ce.status = 'ENROLLED'
     JOIN StudentProfileCache s
         ON s.studentId = ce.studentId
     JOIN FacultyLoadCache fl
@@ -182,7 +182,7 @@ public interface ReportRepository extends Repository<Exam, Long> {
         ON ass.exam.examId = a.examId
         AND ass.classOfferingId = ce.classOfferingId
     WHERE a.examId = :examId
-      AND UPPER(ce.status) = 'ENROLLED'
+      AND ce.status = 'ENROLLED'
       AND (:classOfferingId IS NULL OR ass.classOfferingId = :classOfferingId)
     ORDER BY a.studentId ASC
 """)
@@ -209,7 +209,7 @@ public interface ReportRepository extends Repository<Exam, Long> {
       AND l.durationMs IS NOT NULL
       AND l.module = 'EXAM_TAKING'
       AND l.action IN ('QUESTION_DURATION')
-      AND UPPER(ce.status) = 'ENROLLED'
+      AND ce.status = 'ENROLLED'
       AND (:classOfferingId IS NULL OR ass.classOfferingId = :classOfferingId)
     GROUP BY l.attemptId
 """)
@@ -253,7 +253,7 @@ public interface ReportRepository extends Repository<Exam, Long> {
         AND ans.question.questionId = q.questionId
     LEFT JOIN ans.selectedChoiceId sc
     WHERE a.examId = :examId
-        AND UPPER(ce.status) = 'ENROLLED'
+        AND ce.status = 'ENROLLED'
         AND (:classOfferingId IS NULL OR ass.classOfferingId = :classOfferingId)
     ORDER BY
         s.lastName ASC,
@@ -285,7 +285,7 @@ public interface ReportRepository extends Repository<Exam, Long> {
         ON ass.exam.examId = ans.attempt.examId
         AND ass.classOfferingId = ce.classOfferingId
     WHERE ans.attempt.examId = :examId
-        AND UPPER(ce.status) = 'ENROLLED'
+        AND ce.status = 'ENROLLED'
         AND (:classOfferingId IS NULL OR ass.classOfferingId = :classOfferingId)
     ORDER BY
         ans.attempt.attemptId ASC,
@@ -324,7 +324,7 @@ public interface ReportRepository extends Repository<Exam, Long> {
         WITH assigned AS (
             SELECT DISTINCT ce.student_id
             FROM exam_assignment ea
-            JOIN class_enrollment_cache ce ON ce.class_offering_id = ea.class_offering_id AND UPPER(ce.status) = 'ENROLLED'
+            JOIN class_enrollment_cache ce ON ce.class_offering_id = ea.class_offering_id AND ce.status = 'ENROLLED'
             WHERE ea.exam_id = :examId
               AND (:classOfferingId IS NULL OR ea.class_offering_id = :classOfferingId)
         ),
@@ -359,7 +359,7 @@ public interface ReportRepository extends Repository<Exam, Long> {
             JOIN class_enrollment_cache ce
                 ON ce.class_offering_id = ea.class_offering_id
                AND ce.student_id = a.student_id
-               AND UPPER(ce.status) = 'ENROLLED'
+               AND ce.status = 'ENROLLED'
             WHERE v.exam_id = :examId
               AND (:classOfferingId IS NULL OR ea.class_offering_id = :classOfferingId)
             )
@@ -452,7 +452,7 @@ public interface ReportRepository extends Repository<Exam, Long> {
         JOIN class_enrollment_cache ce
             ON ce.class_offering_id = ea.class_offering_id
            AND ce.student_id = a.student_id
-           AND UPPER(ce.status) = 'ENROLLED'
+           AND ce.status = 'ENROLLED'
         WHERE a.exam_id = :examId
           AND a.status IN ('SUBMITTED', 'AUTO_SUBMITTED')
           AND (:classOfferingId IS NULL OR ea.class_offering_id = :classOfferingId)
@@ -504,7 +504,7 @@ public interface ReportRepository extends Repository<Exam, Long> {
         JOIN class_enrollment_cache ce
             ON ce.class_offering_id = ea.class_offering_id
            AND ce.student_id = a.student_id
-           AND UPPER(ce.status) = 'ENROLLED'
+           AND ce.status = 'ENROLLED'
         WHERE v.exam_id = :examId
           AND (:classOfferingId IS NULL OR ea.class_offering_id = :classOfferingId)
         GROUP BY CAST(v.violation_type AS TEXT)
@@ -524,7 +524,7 @@ public interface ReportRepository extends Repository<Exam, Long> {
         JOIN class_enrollment_cache ce
             ON ce.class_offering_id = ea.class_offering_id
            AND ce.student_id = a.student_id
-           AND UPPER(ce.status) = 'ENROLLED'
+           AND ce.status = 'ENROLLED'
         WHERE a.exam_id = :examId
           AND a.status IN ('SUBMITTED', 'AUTO_SUBMITTED')
           AND (:classOfferingId IS NULL OR ea.class_offering_id = :classOfferingId)

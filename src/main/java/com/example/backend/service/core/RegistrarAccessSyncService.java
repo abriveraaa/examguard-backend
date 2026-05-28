@@ -1,31 +1,31 @@
 package com.example.backend.service.core;
 
+import com.example.backend.audit.TrackActivity;
 import com.example.backend.entity.cache.FacultyProfileCache;
 import com.example.backend.entity.cache.StudentProfileCache;
 import com.example.backend.entity.core.UserAccess;
 import com.example.backend.repository.cache.FacultyProfileCacheRepository;
 import com.example.backend.repository.cache.StudentProfileCacheRepository;
 import com.example.backend.repository.core.UserAccessRepository;
+import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
 
 @Service
+@AllArgsConstructor
 public class RegistrarAccessSyncService {
 
     private final StudentProfileCacheRepository studentProfileCacheRepository;
     private final FacultyProfileCacheRepository facultyProfileCacheRepository;
     private final UserAccessRepository userAccessRepository;
 
-    public RegistrarAccessSyncService(StudentProfileCacheRepository studentProfileCacheRepository,
-                                      FacultyProfileCacheRepository facultyProfileCacheRepository,
-                                      UserAccessRepository userAccessRepository) {
-        this.studentProfileCacheRepository = studentProfileCacheRepository;
-        this.facultyProfileCacheRepository = facultyProfileCacheRepository;
-        this.userAccessRepository = userAccessRepository;
-    }
-
+    @TrackActivity(
+            module = "REGISTRAR_SYNC",
+            action = "SYNC_ACCESS_STATUS",
+            message = "Registrar access synchronization started"
+    )
     public String refreshAndSyncAccessStatus() {
         List<StudentProfileCache> students = studentProfileCacheRepository.findAll();
         List<FacultyProfileCache> facultyList = facultyProfileCacheRepository.findAll();
@@ -125,6 +125,11 @@ public class RegistrarAccessSyncService {
                 .findFirst();
     }
 
+    @TrackActivity(
+            module = "REGISTRAR_SYNC",
+            action = "VIEW_REACTIVATION_ELIGIBLE_USERS",
+            message = "Viewed users eligible for reactivation"
+    )
     public List<UserAccess> getEligibleForReactivationUsers() {
         return userAccessRepository.findByEligibleForReactivationTrue();
     }

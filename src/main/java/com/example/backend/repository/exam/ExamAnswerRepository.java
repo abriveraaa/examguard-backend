@@ -24,7 +24,7 @@ public interface ExamAnswerRepository
     WHERE a.attempt.attemptId = :attemptId
       AND (
           a.needsChecking = true
-          OR UPPER(a.reviewStatus) IN ('PENDING', 'FLAGGED')
+          OR a.reviewStatus IN ('PENDING', 'FLAGGED')
       )
 """)
     boolean existsPendingReviewByAttemptId(@Param("attemptId") Long attemptId);

@@ -11,8 +11,12 @@ import com.example.backend.repository.core.*;
 import com.example.backend.entity.core.UserAccess;
 import com.example.backend.service.core.AccountStatusLogService;
 import com.example.backend.service.core.EmailService;
+import com.example.backend.audit.ActivityTarget;
+import com.example.backend.audit.ActivityTargetType;
+import com.example.backend.audit.TrackActivity;
 import com.example.backend.utility.TimeUtil;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
+import lombok.AllArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -20,9 +24,9 @@ import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.Optional;
 import java.util.Random;
-import java.util.UUID;
 
 @Service
+@AllArgsConstructor
 public class AuthService {
 
     private final UserAccessRepository userAccessRepository;
@@ -35,29 +39,19 @@ public class AuthService {
     private final FacultyProfileCacheRepository facultyProfileCacheRepository;
     private final AccountStatusLogService accountStatusLogService;
 
-    public AuthService(UserAccessRepository userAccessRepository,
-                       UserAccessLogRepository userAccessLogRepository,
-                       UserSessionLogRepository userSessionLogRepository,
-                       PasswordEncoder passwordEncoder,
-                       EmailService emailService,
-                       AdminProfileRepository adminProfileRepository,
-                       StudentProfileCacheRepository studentProfileCacheRepository,
-                       FacultyProfileCacheRepository facultyProfileCacheRepository,
-                       AccountStatusLogService accountStatusLogService) {
-        this.userAccessRepository = userAccessRepository;
-        this.userAccessLogRepository = userAccessLogRepository;
-        this.userSessionLogRepository = userSessionLogRepository;
-        this.passwordEncoder = passwordEncoder;
-        this.emailService = emailService;
-        this.adminProfileRepository = adminProfileRepository;
-        this.studentProfileCacheRepository = studentProfileCacheRepository;
-        this.facultyProfileCacheRepository = facultyProfileCacheRepository;
-        this.accountStatusLogService = accountStatusLogService;
 
-
-    }
-
-    public ActivationResult activateAccount(String schoolId, String email, String birthday, String ipAddress) {
+    @TrackActivity(
+            module = "AUTH",
+            action = "ACTIVATE_ACCOUNT",
+            message = "User attempted account activation"
+    )
+    public ActivationResult activateAccount(
+            @ActivityTarget(ActivityTargetType.TARGET_USER_ID)
+            String schoolId,
+            String email,
+            String birthday,
+            String ipAddress
+    ) {
         String originalSchoolId = sanitizeSchoolId(schoolId);
         String cleanedEmail = email == null ? "" : email.trim();
         String cleanedBirthday = normalizeDateString(birthday);
@@ -160,12 +154,25 @@ public class AuthService {
         return new ActivationResult(false, "No matching record was found.", null);
     }
 
+    @TrackActivity(
+            module = "AUTH",
+            action = "CREATE_ACCOUNT",
+            message = "User account created successfully"
+    )
     @Transactional
-    public ActivationResult createActivatedAccount(String originalSchoolId,
-                                                   String normalizedUsername,
-                                                   String email,
-                                                   String role,
-                                                   String ipAddress) {
+    public ActivationResult createActivatedAccount(
+
+            @ActivityTarget(ActivityTargetType.TARGET_USER_ID)
+            String originalSchoolId,
+
+            String normalizedUsername,
+            String email,
+
+            @ActivityTarget(ActivityTargetType.TARGET_ROLE)
+            String role,
+
+            String ipAddress
+    ) {
         try {
             String tempPassword = generateTempPassword();
 
@@ -209,7 +216,19 @@ public class AuthService {
         }
     }
 
-    public LoginResult login(String schoolIdInput, String password, String ipAddress) {
+    @TrackActivity(
+            module = "AUTH",
+            action = "LOGIN",
+            message = "User login attempt"
+    )
+    public LoginResult login(
+
+            @ActivityTarget(ActivityTargetType.TARGET_USER_ID)
+            String schoolIdInput,
+
+            String password,
+            String ipAddress
+    ) {
         String typedValue = sanitizeSchoolId(schoolIdInput);
         String normalizedUsername = normalizeId(typedValue);
 
@@ -348,7 +367,15 @@ public class AuthService {
         );
     }
 
-    public boolean changePassword(ChangePasswordRequest request, String ipAddress) {
+    @TrackActivity(
+            module = "AUTH",
+            action = "CHANGE_PASSWORD",
+            message = "User password change attempt"
+    )
+    public boolean changePassword(
+            ChangePasswordRequest request,
+            String ipAddress
+    ) {
         String typedValue = sanitizeSchoolId(request.getSchoolId());
         String normalizedUsername = normalizeId(typedValue);
 
@@ -412,7 +439,15 @@ public class AuthService {
         return true;
     }
 
-    public boolean forgotPassword(ForgotPasswordRequest request, String ipAddress) {
+    @TrackActivity(
+            module = "AUTH",
+            action = "FORGOT_PASSWORD",
+            message = "User forgot password request"
+    )
+    public boolean forgotPassword(
+            ForgotPasswordRequest request,
+            String ipAddress
+    ) {
         String originalSchoolId = sanitizeSchoolId(request.getSchoolId());
         String cleanedEmail = request.getEmail() == null ? "" : request.getEmail().trim();
         String cleanedBirthday = normalizeDateString(request.getBirthday());
@@ -520,12 +555,20 @@ public class AuthService {
         return true;
     }
 
-    public boolean logout(LogoutRequest request, String ipAddress) {
+    @TrackActivity(
+            module = "AUTH",
+            action = "LOGOUT",
+            message = "User logout request"
+    )
+    public boolean logout(
+            LogoutRequest request,
+            String ipAddress
+    ) {
         if (request.getSessionToken() == null || request.getSessionToken().isBlank()) {
             return false;
         }
 
-        Optional<UserSessionLog> sessionOpt = userSessionLogRepository.findBySessionToken(request.getSessionToken());
+        Optional<UserSessionLog> sessionOpt = userSessionLogRepository.findBySessionTokenWithUser(request.getSessionToken());
 
         if (sessionOpt.isEmpty()) {
             return false;
@@ -553,7 +596,7 @@ public class AuthService {
             return false;
         }
 
-        Optional<UserSessionLog> sessionOpt = userSessionLogRepository.findBySessionToken(sessionToken);
+        Optional<UserSessionLog> sessionOpt = userSessionLogRepository.findBySessionTokenWithUser(sessionToken);
 
         if (sessionOpt.isEmpty()) {
             return false;
@@ -602,6 +645,7 @@ public class AuthService {
         return sessionToken;
     }
 
+    @Transactional(readOnly = true)
     public UserAccess getUserFromSession(String sessionToken) {
 
         if (sessionToken == null || sessionToken.isBlank()) {
@@ -613,7 +657,7 @@ public class AuthService {
                 .trim();
 
         Optional<UserSessionLog> sessionOpt =
-                userSessionLogRepository.findBySessionToken(cleanedToken);
+                userSessionLogRepository.findBySessionTokenWithUser(cleanedToken);
 
         if (sessionOpt.isEmpty()) {
             return null;

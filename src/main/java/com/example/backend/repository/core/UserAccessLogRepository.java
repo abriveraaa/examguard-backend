@@ -48,12 +48,12 @@ public interface UserAccessLogRepository extends JpaRepository<UserAccessLog, Lo
           AND l.createdAt <= :endDate
           AND (
                 :search = ''
-                OR LOWER(COALESCE(l.schoolId, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-                OR LOWER(COALESCE(l.username, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-                OR LOWER(COALESCE(l.eventType, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-                OR LOWER(COALESCE(l.eventStatus, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-                OR LOWER(COALESCE(l.message, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-                OR LOWER(COALESCE(l.ipAddress, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+                OR l.schoolId LIKE CONCAT('%', :search, '%')
+                OR l.username LIKE CONCAT('%', :search, '%')
+                OR l.eventType LIKE CONCAT('%', :search, '%')
+                OR l.eventStatus LIKE CONCAT('%', :search, '%')
+                OR l.message LIKE CONCAT('%', :search, '%')
+                OR l.ipAddress LIKE CONCAT('%', :search, '%')
               )
         ORDER BY l.createdAt DESC
     """)
@@ -78,8 +78,8 @@ public interface UserAccessLogRepository extends JpaRepository<UserAccessLog, Lo
         ON ua.access_id = ual.access_id
     WHERE ual.created_at >= :startDate
       AND ual.created_at <= :endDate
-      AND UPPER(COALESCE(ual.event_type, '')) = 'LOGIN'
-      AND UPPER(COALESCE(ual.event_status, '')) = 'SUCCESS'
+      AND ual.event_type = 'LOGIN'
+      AND ual.event_status = 'SUCCESS'
       AND (:role = 'All Roles' OR ua.role = :role)
     GROUP BY label, category
     ORDER BY label
@@ -100,8 +100,8 @@ public interface UserAccessLogRepository extends JpaRepository<UserAccessLog, Lo
         ON ua.access_id = ual.access_id
     WHERE ual.created_at >= :startDate
       AND ual.created_at <= :endDate
-      AND UPPER(COALESCE(ual.event_type, '')) = 'LOGIN'
-      AND UPPER(COALESCE(ual.event_status, '')) = 'SUCCESS'
+      AND ual.event_type = 'LOGIN'
+      AND ual.event_status = 'SUCCESS'
       AND (:role = 'All Roles' OR ua.role = :role)
     GROUP BY label, category
     ORDER BY label
@@ -122,8 +122,8 @@ public interface UserAccessLogRepository extends JpaRepository<UserAccessLog, Lo
         ON ua.access_id = ual.access_id
     WHERE ual.created_at >= :startDate
       AND ual.created_at <= :endDate
-      AND UPPER(COALESCE(ual.event_type, '')) = 'LOGIN'
-      AND UPPER(COALESCE(ual.event_status, '')) = 'SUCCESS'
+      AND ual.event_type = 'LOGIN'
+      AND ual.event_status = 'SUCCESS'
       AND (:role = 'All Roles' OR ua.role = :role)
     GROUP BY label, category
     ORDER BY label
@@ -144,8 +144,8 @@ public interface UserAccessLogRepository extends JpaRepository<UserAccessLog, Lo
         ON ua.access_id = ual.access_id
     WHERE ual.created_at >= :startDate
       AND ual.created_at <= :endDate
-      AND UPPER(COALESCE(ual.event_type, '')) = 'LOGIN'
-      AND UPPER(COALESCE(ual.event_status, '')) = 'SUCCESS'
+      AND ual.event_type = 'LOGIN'
+      AND ual.event_status = 'SUCCESS'
       AND (:role = 'All Roles' OR ua.role = :role)
     GROUP BY label, category
     ORDER BY label

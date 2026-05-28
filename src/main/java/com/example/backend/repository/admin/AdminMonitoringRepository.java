@@ -42,8 +42,8 @@ public interface AdminMonitoringRepository extends JpaRepository<SystemActivityL
         WHERE (l.occurredAt >= :startDate)
           AND (l.occurredAt <= :endDate)
           AND (
-                UPPER(COALESCE(l.status, '')) IN ('FAILED', 'ERROR', 'CRITICAL')
-                OR LOWER(COALESCE(l.message, '')) LIKE '%critical%'
+                COALESCE(l.status, '') IN ('FAILED', 'ERROR', 'CRITICAL')
+                OR COALESCE(l.message, '') LIKE '%critical%'
                 OR COALESCE(l.durationMs, 0) >= 5000
               )
     """)
@@ -84,11 +84,6 @@ public interface AdminMonitoringRepository extends JpaRepository<SystemActivityL
         WHERE (l.occurredAt >= :startDate)
           AND (l.occurredAt <= :endDate)
           AND (l.module <> 'EXAM_TAKING')
-          AND (
-                UPPER(COALESCE(l.status, '')) IN ('FAILED', 'ERROR', 'CRITICAL')
-                OR LOWER(COALESCE(l.message, '')) LIKE '%critical%'
-                OR COALESCE(l.durationMs, 0) >= 3000
-              )
         ORDER BY l.occurredAt DESC
     """)
     List<AdminLogRowDto> recentAttentionSystemEvents(
@@ -128,12 +123,12 @@ public interface AdminMonitoringRepository extends JpaRepository<SystemActivityL
       AND (:role = 'All Roles' OR l.actorRole = :role)
       AND (
             :search = ''
-            OR LOWER(COALESCE(l.actorId, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-            OR LOWER(COALESCE(l.actorRole, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-            OR LOWER(COALESCE(l.module, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-            OR LOWER(COALESCE(l.action, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-            OR LOWER(COALESCE(l.status, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-            OR LOWER(COALESCE(l.message, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+            OR l.actorId LIKE CONCAT('%', :search, '%')
+            OR l.actorRole LIKE CONCAT('%', :search, '%')
+            OR l.module LIKE CONCAT('%', :search, '%')
+            OR l.action LIKE CONCAT('%', :search, '%')
+            OR l.status LIKE CONCAT('%', :search, '%')
+            OR l.message LIKE CONCAT('%', :search, '%')
           )
     ORDER BY l.occurredAt DESC
 """)

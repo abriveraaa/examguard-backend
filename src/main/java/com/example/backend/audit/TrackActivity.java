@@ -11,5 +11,7 @@ public @interface TrackActivity {
 
     String action();
 
+    String message() default "";
+
     boolean logArgs() default false;
 }

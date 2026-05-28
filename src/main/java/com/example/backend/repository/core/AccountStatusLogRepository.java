@@ -44,13 +44,13 @@ public interface AccountStatusLogRepository extends JpaRepository<AccountStatusL
           AND l.createdAt <= :endDate
           AND (
                 :search = ''
-                OR LOWER(COALESCE(l.schoolId, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-                OR LOWER(COALESCE(l.role, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-                OR LOWER(COALESCE(l.action, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-                OR LOWER(COALESCE(l.reason, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-                OR LOWER(COALESCE(l.performedBy, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-                OR LOWER(COALESCE(l.previousStatus, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-                OR LOWER(COALESCE(l.newStatus, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+                OR l.schoolId LIKE CONCAT('%', :search, '%')
+                OR l.role LIKE CONCAT('%', :search, '%')
+                OR l.action LIKE CONCAT('%', :search, '%')
+                OR l.reason LIKE CONCAT('%', :search, '%')
+                OR l.performedBy LIKE CONCAT('%', :search, '%')
+                OR l.previousStatus LIKE CONCAT('%', :search, '%')
+                OR l.newStatus LIKE CONCAT('%', :search, '%')
               )
         ORDER BY l.createdAt DESC
     """)

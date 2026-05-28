@@ -7,6 +7,7 @@ import com.example.backend.entity.exam.ExamQuestion;
 import com.example.backend.repository.exam.ExamChoiceRepository;
 import com.example.backend.repository.exam.ExamQuestionRepository;
 import com.example.backend.repository.exam.ExamRepository;
+import lombok.AllArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
@@ -18,21 +19,12 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
+@AllArgsConstructor
 public class ExamTakingCacheService {
 
     private final ExamRepository examRepository;
     private final ExamQuestionRepository questionRepository;
     private final ExamChoiceRepository choiceRepository;
-
-    public ExamTakingCacheService(
-            ExamRepository examRepository,
-            ExamQuestionRepository questionRepository,
-            ExamChoiceRepository choiceRepository
-    ) {
-        this.examRepository = examRepository;
-        this.questionRepository = questionRepository;
-        this.choiceRepository = choiceRepository;
-    }
 
     @Cacheable(value = "examTakingRawContent", key = "#examId")
     public ExamTakingRawContent getRawContent(Long examId) {

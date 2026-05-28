@@ -60,22 +60,6 @@ public class StudentController {
         return ResponseEntity.ok().build();
     }
 
-    @PostMapping("/dashboard/violations/{examId}/view")
-    public ResponseEntity<Void> markViolationViewed(
-            @PathVariable Long examId,
-            @RequestHeader("Authorization") String authorization
-    ) {
-        UserAccess user = authService.getUserFromSession(authorization);
-
-        studentService.markDashboardItemViewed(
-                user.getSchoolId(),
-                "VIOLATION",
-                examId
-        );
-
-        return ResponseEntity.ok().build();
-    }
-
     @PostMapping("/exams/answers/save")
     public ResponseEntity<ExamResult> saveAnswer(
             @RequestBody SaveAnswerRequest request,

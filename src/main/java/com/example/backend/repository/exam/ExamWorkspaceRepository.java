@@ -130,7 +130,7 @@ LEFT JOIN ExamViolationLog v
     ON v.attempt.attemptId = attempt.attemptId
 WHERE e.examId = :examId
   AND (
-        UPPER(:role) = 'ADMIN'
+        :role = 'ADMIN'
         OR fl.employeeId = :employeeId
   )
 GROUP BY
@@ -173,7 +173,7 @@ GROUP BY
            AND enrollment.status = 'ENROLLED'
         WHERE ass.exam.examId = :examId
           AND (
-                UPPER(:role) = 'ADMIN'
+                :role = 'ADMIN'
                 OR fl.employeeId = :employeeId
           )
         GROUP BY
@@ -236,7 +236,7 @@ GROUP BY
            AND essayAnswer.question.questionType =
                 com.example.backend.entity.enums.QuestionType.ESSAY
         WHERE e.examId = :examId
-          AND ( UPPER(:role) = 'ADMIN' OR fl.employeeId = :employeeId )
+          AND ( :role = 'ADMIN' OR fl.employeeId = :employeeId )
           AND attempt.status IN (
                 com.example.backend.entity.enums.ExamAttemptStatus.SUBMITTED,
                 com.example.backend.entity.enums.ExamAttemptStatus.AUTO_SUBMITTED
@@ -297,7 +297,7 @@ GROUP BY
         LEFT JOIN StudentProfileCache s
             ON s.studentId = attempt.studentId
         WHERE e.examId = :examId
-          AND ( UPPER(:role) = 'ADMIN' OR fl.employeeId = :employeeId )
+          AND ( :role = 'ADMIN' OR fl.employeeId = :employeeId )
         GROUP BY
             attempt.attemptId,
             e.examId,
@@ -360,7 +360,7 @@ GROUP BY
            AND essayAnswer.question.questionType = com.example.backend.entity.enums.QuestionType.ESSAY
         WHERE ass.exam.examId = :examId
           AND (
-                UPPER(:role) = 'ADMIN'
+                :role = 'ADMIN'
                 OR fl.employeeId = :employeeId
           )
         GROUP BY
@@ -414,7 +414,7 @@ GROUP BY
         ON violation.attempt.attemptId = attempt.attemptId
 
     WHERE attempt.examId = :examId
-      AND ( UPPER(:role) = 'ADMIN' OR load.employeeId = :employeeId )
+      AND ( :role = 'ADMIN' OR load.employeeId = :employeeId )
       AND attempt.status IN (
             com.example.backend.entity.enums.ExamAttemptStatus.SUBMITTED,
             com.example.backend.entity.enums.ExamAttemptStatus.AUTO_SUBMITTED
@@ -683,7 +683,7 @@ GROUP BY
             ON fl.classOfferingId = ass.classOfferingId
         WHERE e.examId = :examId
           AND (
-                UPPER(:role) = 'ADMIN'
+                :role = 'ADMIN'
                 OR fl.employeeId = :employeeId
           )
         """)

@@ -1,5 +1,8 @@
 package com.example.backend.service.faculty;
 
+import com.example.backend.audit.ActivityTarget;
+import com.example.backend.audit.ActivityTargetType;
+import com.example.backend.audit.TrackActivity;
 import com.example.backend.dto.faculty.students.*;
 import com.example.backend.report.faculty.StudentRosterExcelExportService;
 import com.example.backend.report.faculty.StudentRosterExportService;
@@ -24,12 +27,22 @@ public class FacultyStudentsService {
     private final StudentRosterExportService studentRosterExportService;
     private final StudentRosterExcelExportService studentRosterExcelExportService;
 
+    @TrackActivity(
+            module = "FACULTY_STUDENTS",
+            action = "VIEW_ACADEMIC_PERIODS",
+            message = "Faculty viewed academic periods"
+    )
     public List<FacultyAcademicPeriodDTO> getAcademicPeriods(
             String employeeId
     ) {
         return facultyLoadCacheRepository.findAcademicPeriodsByFaculty(employeeId);
     }
 
+    @TrackActivity(
+            module = "FACULTY_STUDENTS",
+            action = "VIEW_STUDENTS_BY_PERIOD",
+            message = "Faculty viewed students by academic period"
+    )
     public List<FacultyStudentDTO> getStudentsByPeriod(
             String employeeId,
             String academicYear,
@@ -42,6 +55,11 @@ public class FacultyStudentsService {
         );
     }
 
+    @TrackActivity(
+            module = "FACULTY_STUDENTS",
+            action = "EXPORT_STUDENT_ROSTER",
+            message = "Faculty exported student roster"
+    )
     public byte[] exportStudentsRoster(
             String facultyId,
             String academicYear,
@@ -96,6 +114,11 @@ public class FacultyStudentsService {
         return List.copyOf(unique.values());
     }
 
+    @TrackActivity(
+            module = "FACULTY_STUDENTS",
+            action = "VIEW_FILTERED_STUDENTS",
+            message = "Faculty viewed filtered students"
+    )
     public List<FacultyStudentDTO> getStudentsByFilters(
             String employeeId,
             String academicYear,

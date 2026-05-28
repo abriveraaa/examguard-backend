@@ -1,5 +1,6 @@
 package com.example.backend.service.exam;
 
+import com.example.backend.audit.TrackActivity;
 import com.example.backend.dto.exam.request.ChoiceRequest;
 import com.example.backend.dto.exam.request.EssayRubricRequest;
 import com.example.backend.dto.exam.request.QuestionRequest;
@@ -14,6 +15,11 @@ import java.util.List;
 @Service
 public class ExamTemplateService {
 
+    @TrackActivity(
+            module = "EXAM_TEMPLATE",
+            action = "PARSE_TEMPLATE",
+            message = "Exam template parsing attempted"
+    )
     public List<QuestionRequest> parseTemplate(MultipartFile file) throws Exception {
         if (file == null || file.isEmpty()) {
             throw new RuntimeException("Uploaded file is empty.");

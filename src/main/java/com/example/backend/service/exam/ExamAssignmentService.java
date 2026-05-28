@@ -1,5 +1,8 @@
 package com.example.backend.service.exam;
 
+import com.example.backend.audit.ActivityTarget;
+import com.example.backend.audit.ActivityTargetType;
+import com.example.backend.audit.TrackActivity;
 import com.example.backend.dto.exam.request.AssignExamRequest;
 import com.example.backend.dto.exam.result.AssignExamResult;
 import com.example.backend.entity.enums.ExamStatus;
@@ -9,10 +12,12 @@ import com.example.backend.repository.cache.ClassOfferingCacheRepository;
 import com.example.backend.repository.cache.FacultyLoadCacheRepository;
 import com.example.backend.repository.exam.ExamAssignmentRepository;
 import com.example.backend.repository.exam.ExamRepository;
+import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@AllArgsConstructor
 public class ExamAssignmentService {
 
     private final ExamRepository examRepository;
@@ -20,19 +25,19 @@ public class ExamAssignmentService {
     private final ClassOfferingCacheRepository classOfferingRepository;
     private final FacultyLoadCacheRepository facultyLoadRepository;
 
-
-    public ExamAssignmentService(ExamRepository examRepository,
-                                 ExamAssignmentRepository assignmentRepository,
-                                 ClassOfferingCacheRepository classOfferingRepository,
-                                 FacultyLoadCacheRepository facultyLoadRepository) {
-        this.examRepository = examRepository;
-        this.assignmentRepository = assignmentRepository;
-        this.classOfferingRepository = classOfferingRepository;
-        this.facultyLoadRepository = facultyLoadRepository;
-    }
-
+    @TrackActivity(
+            module = "EXAM_ASSIGNMENT",
+            action = "ASSIGN_EXAM",
+            message = "Exam assignment attempted"
+    )
     @Transactional
-    public AssignExamResult assignExam(Long examId, AssignExamRequest request) {
+    public AssignExamResult assignExam(
+
+            @ActivityTarget(ActivityTargetType.EXAM_ID)
+            Long examId,
+
+            AssignExamRequest request
+    ) {
 
         Exam exam = examRepository.findById(examId).orElse(null);
 

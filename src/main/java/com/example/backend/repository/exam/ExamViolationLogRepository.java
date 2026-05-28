@@ -49,7 +49,7 @@ public interface ExamViolationLogRepository extends JpaRepository<ExamViolationL
         CASE
             WHEN MAX(
                 CASE
-                    WHEN UPPER(v.reviewStatus) IN ('REVIEWED', 'PENALIZED', 'IGNORED')
+                    WHEN v.reviewStatus IN ('REVIEWED', 'PENALIZED', 'IGNORED')
                     THEN 1
                     ELSE 0
                 END
@@ -67,7 +67,7 @@ public interface ExamViolationLogRepository extends JpaRepository<ExamViolationL
        AND ce.classOfferingId = ass.classOfferingId
     JOIN ClassOfferingCache co ON co.classOfferingId = ass.classOfferingId
     WHERE a.studentId = :studentId
-      AND UPPER(v.reviewStatus) IN ('PENDING_REVIEW', 'REVIEWED', 'PENALIZED', 'IGNORED')
+      AND v.reviewStatus IN ('PENDING_REVIEW', 'REVIEWED', 'PENALIZED', 'IGNORED')
       AND NOT EXISTS (
           SELECT 1
           FROM StudentDashboardView dv

@@ -7,6 +7,10 @@ import com.example.backend.entity.core.AdminProfile;
 import com.example.backend.entity.core.UserAccess;
 import com.example.backend.repository.core.AdminProfileRepository;
 import com.example.backend.repository.core.UserAccessRepository;
+import com.example.backend.audit.ActivityTarget;
+import com.example.backend.audit.ActivityTargetType;
+import com.example.backend.audit.TrackActivity;
+import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -16,20 +20,18 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
+@AllArgsConstructor
 public class AdminProfileService {
 
     private final AdminProfileRepository adminProfileRepository;
     private final UserAccessRepository userAccessRepository;
     private final AccountStatusLogService accountStatusLogService;
 
-    public AdminProfileService(AdminProfileRepository adminProfileRepository,
-                               UserAccessRepository userAccessRepository,
-                               AccountStatusLogService accountStatusLogService) {
-        this.adminProfileRepository = adminProfileRepository;
-        this.userAccessRepository = userAccessRepository;
-        this.accountStatusLogService = accountStatusLogService;
-    }
-
+    @TrackActivity(
+            module = "ADMIN_PROFILE",
+            action = "CREATE_ADMIN_PROFILE",
+            message = "Admin profile creation attempted"
+    )
     public String createAdminProfile(CreateAdminProfileRequest request) {
         String employeeId = sanitize(request.getEmployeeId()).toUpperCase();
         String email = sanitize(request.getEmail()).toLowerCase();
@@ -63,6 +65,11 @@ public class AdminProfileService {
         return "Admin profile created successfully.";
     }
 
+    @TrackActivity(
+            module = "ADMIN_PROFILE",
+            action = "VIEW_ADMIN_PROFILES",
+            message = "Admin profile list viewed"
+    )
     public List<AdminUserResponse> getAllAdminProfiles() {
         return adminProfileRepository.findAll()
                 .stream()
@@ -70,14 +77,31 @@ public class AdminProfileService {
                 .collect(Collectors.toList());
     }
 
-    public AdminUserResponse getAdminProfileByEmployeeId(String employeeId) {
+    @TrackActivity(
+            module = "ADMIN_PROFILE",
+            action = "VIEW_ADMIN_PROFILE",
+            message = "Admin profile viewed"
+    )
+    public AdminUserResponse getAdminProfileByEmployeeId(
+            @ActivityTarget(ActivityTargetType.TARGET_USER_ID)
+            String employeeId
+    ) {
         String safeEmployeeId = sanitize(employeeId).toUpperCase();
 
         Optional<AdminProfile> adminOpt = adminProfileRepository.findByEmployeeId(safeEmployeeId);
         return adminOpt.map(this::toResponse).orElse(null);
     }
 
-    public String updateAdminProfile(String employeeId, UpdateAdminProfileRequest request) {
+    @TrackActivity(
+            module = "ADMIN_PROFILE",
+            action = "UPDATE_ADMIN_PROFILE",
+            message = "Admin profile update attempted"
+    )
+    public String updateAdminProfile(
+            @ActivityTarget(ActivityTargetType.TARGET_USER_ID)
+            String employeeId,
+            UpdateAdminProfileRequest request
+    ) {
         String safeEmployeeId = sanitize(employeeId).toUpperCase();
 
         Optional<AdminProfile> adminOpt = adminProfileRepository.findByEmployeeId(safeEmployeeId);
@@ -131,7 +155,17 @@ public class AdminProfileService {
         return "Admin profile updated successfully.";
     }
 
-    public String deactivateAdminProfile(String employeeId, String currentAdminId, String reason) {
+    @TrackActivity(
+            module = "ADMIN_PROFILE",
+            action = "DEACTIVATE_ADMIN_PROFILE",
+            message = "Admin profile deactivation attempted"
+    )
+    public String deactivateAdminProfile(
+            @ActivityTarget(ActivityTargetType.TARGET_USER_ID)
+            String employeeId,
+            String currentAdminId,
+            String reason
+    ) {
         String safeEmployeeId = sanitize(employeeId).toUpperCase();
         String safeCurrentAdminId = sanitize(currentAdminId).toUpperCase();
 
@@ -187,7 +221,16 @@ public class AdminProfileService {
         return "Admin deactivated successfully.";
     }
 
-    public String reactivateAdminProfile(String employeeId, UserAccess performedBy) {
+    @TrackActivity(
+            module = "ADMIN_PROFILE",
+            action = "REACTIVATE_ADMIN_PROFILE",
+            message = "Admin profile reactivation attempted"
+    )
+    public String reactivateAdminProfile(
+            @ActivityTarget(ActivityTargetType.TARGET_USER_ID)
+            String employeeId,
+            UserAccess performedBy
+    ) {
 
         String safeEmployeeId = sanitize(employeeId).toUpperCase();
 

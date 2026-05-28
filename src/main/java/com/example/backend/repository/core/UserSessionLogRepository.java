@@ -29,7 +29,7 @@ public interface UserSessionLogRepository extends JpaRepository<UserSessionLog, 
             'Currently logged-in users with unexpired sessions'
         )
         FROM UserSessionLog s
-        WHERE UPPER(COALESCE(s.loginStatus, '')) = 'ACTIVE'
+        WHERE s.loginStatus = 'ACTIVE'
           AND s.logoutAt IS NULL
           AND s.expiresAt > :now
     """)
@@ -84,12 +84,12 @@ public interface UserSessionLogRepository extends JpaRepository<UserSessionLog, 
           AND COALESCE(l.loginAt, l.createdAt) <= :endDate
           AND (
                 :search = ''
-                OR LOWER(COALESCE(l.schoolId, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-                OR LOWER(COALESCE(l.username, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-                OR LOWER(COALESCE(l.loginStatus, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-                OR LOWER(COALESCE(l.message, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-                OR LOWER(COALESCE(l.ipAddress, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-                OR LOWER(COALESCE(l.deviceInfo, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+                OR l.schoolId LIKE CONCAT('%', :search, '%')
+                OR l.username LIKE CONCAT('%', :search, '%')
+                OR l.loginStatus LIKE CONCAT('%', :search, '%')
+                OR l.message LIKE CONCAT('%', :search, '%')
+                OR l.ipAddress LIKE CONCAT('%', :search, '%')
+                OR l.deviceInfo LIKE CONCAT('%', :search, '%')
               )
         ORDER BY COALESCE(l.loginAt, l.createdAt) DESC
     """)
@@ -114,7 +114,7 @@ public interface UserSessionLogRepository extends JpaRepository<UserSessionLog, 
         ON ua.access_id = usl.access_id
     WHERE usl.login_at >= :startDate
       AND usl.login_at <= :endDate
-      AND UPPER(COALESCE(usl.login_status, '')) = 'ACTIVE'
+      AND COALESCE(usl.login_status, '') = 'ACTIVE'
       AND (:role = 'All Roles' OR ua.role = :role)
     GROUP BY label, category
     ORDER BY label
@@ -135,7 +135,7 @@ public interface UserSessionLogRepository extends JpaRepository<UserSessionLog, 
         ON ua.access_id = usl.access_id
     WHERE usl.login_at >= :startDate
       AND usl.login_at <= :endDate
-      AND UPPER(COALESCE(usl.login_status, '')) = 'ACTIVE'
+      AND COALESCE(usl.login_status, '') = 'ACTIVE'
       AND (:role = 'All Roles' OR ua.role = :role)
     GROUP BY label, category
     ORDER BY label
@@ -156,7 +156,7 @@ public interface UserSessionLogRepository extends JpaRepository<UserSessionLog, 
         ON ua.access_id = usl.access_id
     WHERE usl.login_at >= :startDate
       AND usl.login_at <= :endDate
-      AND UPPER(COALESCE(usl.login_status, '')) = 'ACTIVE'
+      AND COALESCE(usl.login_status, '') = 'ACTIVE'
       AND (:role = 'All Roles' OR ua.role = :role)
     GROUP BY label, category
     ORDER BY label
@@ -177,7 +177,7 @@ public interface UserSessionLogRepository extends JpaRepository<UserSessionLog, 
         ON ua.access_id = usl.access_id
     WHERE usl.login_at >= :startDate
       AND usl.login_at <= :endDate
-      AND UPPER(COALESCE(usl.login_status, '')) = 'ACTIVE'
+      AND COALESCE(usl.login_status, '') = 'ACTIVE'
       AND (:role = 'All Roles' OR ua.role = :role)
     GROUP BY label, category
     ORDER BY label
@@ -187,5 +187,14 @@ public interface UserSessionLogRepository extends JpaRepository<UserSessionLog, 
             @Param("endDate") OffsetDateTime endDate,
             @Param("role") String role
     );
+
+
+    @Query("""
+    SELECT s
+    FROM UserSessionLog s
+    JOIN FETCH s.userAccess
+    WHERE s.sessionToken = :token
+""")
+    Optional<UserSessionLog> findBySessionTokenWithUser(@Param("token") String token);
 
 }

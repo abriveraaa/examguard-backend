@@ -1,32 +1,34 @@
 package com.example.backend.service.core;
 
+import com.example.backend.audit.ActivityTarget;
+import com.example.backend.audit.ActivityTargetType;
+import com.example.backend.audit.TrackActivity;
 import com.example.backend.entity.core.ReactivationLog;
 import com.example.backend.entity.core.UserAccess;
 import com.example.backend.repository.core.UserAccessRepository;
 import com.example.backend.repository.core.UserSessionLogRepository;
+import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
 
 @Service
+@AllArgsConstructor
 public class ReactivationService {
 
     private final UserAccessRepository userAccessRepository;
     private final AccountStatusLogService accountStatusLogService;
     private final UserSessionLogRepository userSessionLogRepository;
 
-    public ReactivationService(UserAccessRepository userAccessRepository,
-                               AccountStatusLogService accountStatusLogService,
-                               UserSessionLogRepository userSessionLogRepository) {
-        this.userAccessRepository = userAccessRepository;
-        this.accountStatusLogService = accountStatusLogService;
-        this.userSessionLogRepository = userSessionLogRepository;
-    }
-
     // =========================
     // BULK REACTIVATE
     // =========================
+    @TrackActivity(
+            module = "REACTIVATION",
+            action = "BULK_REACTIVATE_USERS",
+            message = "Bulk user reactivation attempted"
+    )
     public String bulkReactivateEligibleUsers(String justification) {
 
         List<UserAccess> users = userAccessRepository.findByEligibleForReactivationTrue();
@@ -66,9 +68,18 @@ public class ReactivationService {
     // =========================
     // SINGLE REACTIVATE
     // =========================
+    @TrackActivity(
+            module = "REACTIVATION",
+            action = "REACTIVATE_USER",
+            message = "Single user reactivation attempted"
+    )
     public String reactivateSingleUser(
+            @ActivityTarget(ActivityTargetType.TARGET_USER_ID)
             String schoolId,
+
+            @ActivityTarget(ActivityTargetType.TARGET_ROLE)
             String role,
+
             String justification,
             UserAccess performedBy
     ) {

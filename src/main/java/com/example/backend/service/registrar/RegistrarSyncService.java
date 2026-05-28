@@ -1,5 +1,6 @@
 package com.example.backend.service.registrar;
 
+import com.example.backend.audit.TrackActivity;
 import com.example.backend.dto.registrar.*;
 import com.example.backend.entity.cache.*;
 import com.example.backend.entity.core.RegistrarSyncLog;
@@ -7,6 +8,7 @@ import com.example.backend.entity.core.UserAccess;
 import com.example.backend.repository.cache.*;
 import com.example.backend.repository.core.RegistrarSyncLogRepository;
 import com.example.backend.utility.TimeUtil;
+import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,10 +18,10 @@ import java.time.ZoneId;
 import java.util.List;
 
 @Service
+@AllArgsConstructor
 public class RegistrarSyncService {
 
     private final RegistrarApiService api;
-
     private final RegistrarSyncLogRepository registrarSyncLogRepository;
     private final StudentProfileCacheRepository studentRepo;
     private final FacultyProfileCacheRepository facultyRepo;
@@ -27,24 +29,11 @@ public class RegistrarSyncService {
     private final ClassEnrollmentCacheRepository enrollmentRepo;
     private final FacultyLoadCacheRepository facultyLoadRepo;
 
-    public RegistrarSyncService(
-            RegistrarApiService api,
-            RegistrarSyncLogRepository registrarSyncLogRepository,
-            StudentProfileCacheRepository studentRepo,
-            FacultyProfileCacheRepository facultyRepo,
-            ClassOfferingCacheRepository offeringRepo,
-            ClassEnrollmentCacheRepository enrollmentRepo,
-            FacultyLoadCacheRepository facultyLoadRepo
-    ) {
-        this.api = api;
-        this.registrarSyncLogRepository = registrarSyncLogRepository;
-        this.studentRepo = studentRepo;
-        this.facultyRepo = facultyRepo;
-        this.offeringRepo = offeringRepo;
-        this.enrollmentRepo = enrollmentRepo;
-        this.facultyLoadRepo = facultyLoadRepo;
-    }
-
+    @TrackActivity(
+            module = "REGISTRAR_SYNC",
+            action = "INITIAL_SYNC",
+            message = "Registrar initial synchronization attempted"
+    )
     @Transactional
     public String initialSync(UserAccess performedBy) {
 

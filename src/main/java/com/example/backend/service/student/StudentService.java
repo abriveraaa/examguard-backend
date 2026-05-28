@@ -1,5 +1,8 @@
 package com.example.backend.service.student;
 
+import com.example.backend.audit.ActivityTarget;
+import com.example.backend.audit.ActivityTargetType;
+import com.example.backend.audit.TrackActivity;
 import com.example.backend.dto.core.CurrentTermDTO;
 import com.example.backend.dto.student.StudentResultHeaderDTO;
 import com.example.backend.dto.student.dashboard.*;
@@ -39,7 +42,15 @@ public class StudentService {
     private final ExamChoiceRepository examChoiceRepository;
     private final EssayRubricRepository essayRubricRepository;
 
-    public StudentResponse getDashboard(String userId, String role) {
+    @TrackActivity(
+            module = "STUDENT_DASHBOARD",
+            action = "VIEW_DASHBOARD",
+            message = "Student dashboard viewed"
+    )
+    public StudentResponse getDashboard(
+            String userId,
+            String role)
+    {
 
         if (!"STUDENT".equalsIgnoreCase(role)) {
             throw new RuntimeException("Only students can access this dashboard.");
@@ -109,6 +120,11 @@ public class StudentService {
                 .build();
     }
 
+    @TrackActivity(
+            module = "STUDENT_DASHBOARD",
+            action = "MARK_ITEM_VIEWED",
+            message = "Student marked dashboard item as viewed"
+    )
     @Transactional
     public void markDashboardItemViewed(
             String studentId,
@@ -131,8 +147,17 @@ public class StudentService {
         }
     }
 
+    @TrackActivity(
+            module = "STUDENT_RESULTS",
+            action = "VIEW_EXAM_RESULT",
+            message = "Student viewed exam result"
+    )
     @Transactional(readOnly = true)
-    public StudentExamResultResponse getStudentExamResult(Long examId, String studentId) {
+    public StudentExamResultResponse getStudentExamResult(
+            @ActivityTarget(ActivityTargetType.EXAM_ID)
+            Long examId,
+            String studentId
+    ) {
 
         Exam exam = examRepository.findById(examId)
                 .orElseThrow(() -> new RuntimeException("Exam not found."));

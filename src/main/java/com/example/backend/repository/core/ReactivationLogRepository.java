@@ -42,9 +42,9 @@ public interface ReactivationLogRepository extends JpaRepository<ReactivationLog
       AND r.reactivatedAt <= :endDate
       AND (
             :search = ''
-            OR LOWER(COALESCE(r.schoolId, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-            OR LOWER(COALESCE(r.role, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-            OR LOWER(COALESCE(r.justification, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+            OR r.schoolId LIKE CONCAT('%', :search, '%')
+            OR r.role LIKE CONCAT('%', :search, '%')
+            OR r.justification LIKE CONCAT('%', :search, '%')
           )
     ORDER BY r.reactivatedAt DESC
 """)

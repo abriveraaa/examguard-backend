@@ -54,12 +54,12 @@ public interface ExamCameraSessionRepository extends JpaRepository<ExamCameraSes
           AND COALESCE(c.startedAt, c.pairedAt, c.createdAt) <= :endDate
           AND (
                 :search = ''
-                OR LOWER(COALESCE(c.studentId, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-                OR LOWER(COALESCE(c.deviceLabel, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-                OR LOWER(COALESCE(c.deviceType, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-                OR LOWER(COALESCE(c.status, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-                OR LOWER(COALESCE(c.requiredAngle, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-                OR LOWER(COALESCE(c.streamRole, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+                OR c.studentId LIKE CONCAT('%', :search, '%')
+                OR c.deviceLabel LIKE CONCAT('%', :search, '%')
+                OR c.deviceType LIKE CONCAT('%', :search, '%')
+                OR c.status LIKE CONCAT('%', :search, '%')
+                OR c.requiredAngle LIKE CONCAT('%', :search, '%')
+                OR c.streamRole LIKE CONCAT('%', :search, '%')
               )
         ORDER BY COALESCE(c.startedAt, c.pairedAt, c.createdAt) DESC
     """)
