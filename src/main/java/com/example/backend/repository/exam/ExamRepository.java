@@ -47,7 +47,7 @@ public interface ExamRepository extends JpaRepository<Exam, Long> {
         FROM exam_assignment eca
         JOIN class_enrollment_cache ce
             ON ce.class_offering_id = eca.class_offering_id
-        WHERE UPPER(ce.status) = 'ENROLLED'
+        WHERE ce.status = 'ENROLLED'
           AND eca.exam_id = :examId
         """, nativeQuery = true)
     Integer countTakersByExamId(@Param("examId") Long examId);
@@ -64,32 +64,23 @@ public interface ExamRepository extends JpaRepository<Exam, Long> {
     List<Object[]> countTakersByExamIds(@Param("examIds") List<Long> examIds);
 
     @Query(value = """
-    SELECT DISTINCT e.*
+    SELECT e.*
     FROM exam e
-    LEFT JOIN exam_assignment ea 
+    WHERE e.created_by = :employeeId
+
+    UNION
+
+    SELECT e.*
+    FROM exam e
+    JOIN exam_assignment ea
         ON ea.exam_id = e.exam_id
-    LEFT JOIN faculty_load_cache fl 
+    JOIN faculty_load_cache fl
         ON fl.class_offering_id = ea.class_offering_id
     WHERE fl.employee_id = :employeeId
-       OR e.created_by = :employeeId
-    ORDER BY e.created_at DESC
+
+    ORDER BY created_at DESC
     """, nativeQuery = true)
     List<Exam> findVisibleExamsForFaculty(@Param("employeeId") String employeeId);
-
-
-    @Query(value = """
-        SELECT DISTINCT e.*
-        FROM exam e
-        JOIN exam_assignment ea
-            ON ea.exam_id = e.exam_id
-        JOIN class_enrollment_cache ce
-            ON ce.class_offering_id = ea.class_offering_id
-        WHERE ce.student_id = :studentId
-          AND ce.status = 'ENROLLED'
-          AND CURRENT_TIMESTAMP BETWEEN e.start_datetime AND e.end_datetime
-        ORDER BY e.start_datetime ASC
-        """, nativeQuery = true)
-    List<Exam> findAvailableExamsForStudent(@Param("studentId") String studentId);
 
     @Query("""
     SELECT new com.example.backend.dto.student.dashboard.StudentUpcomingExamDTO(
@@ -115,7 +106,7 @@ public interface ExamRepository extends JpaRepository<Exam, Long> {
     LEFT JOIN ExamQuestion q ON q.exam.examId = e.examId
     LEFT JOIN ExamAttempt attempt ON attempt.examId = e.examId AND attempt.studentId = :studentId
     WHERE ce.studentId = :studentId
-      AND UPPER(ce.status) = 'ENROLLED'
+      AND ce.status = 'ENROLLED'
       AND e.status = com.example.backend.entity.enums.ExamStatus.PUBLISHED
       AND e.endDateTime >= CURRENT_TIMESTAMP
       AND (
@@ -164,7 +155,7 @@ public interface ExamRepository extends JpaRepository<Exam, Long> {
         JOIN ClassOfferingCache co ON co.classOfferingId = ass.classOfferingId
         WHERE attempt.studentId = :studentId
           AND ce.studentId = :studentId
-          AND UPPER(ce.status) = 'ENROLLED'
+          AND ce.status = 'ENROLLED'
           AND attempt.status IN (
               com.example.backend.entity.enums.ExamAttemptStatus.SUBMITTED,
               com.example.backend.entity.enums.ExamAttemptStatus.AUTO_SUBMITTED
@@ -240,7 +231,7 @@ public interface ExamRepository extends JpaRepository<Exam, Long> {
         ON fp.employeeId = fl.employeeId
     WHERE ass.exam.examId = :examId
       AND ce.studentId = :studentId
-      AND UPPER(ce.status) = 'ENROLLED'
+      AND ce.status = 'ENROLLED'
 """)
     Optional<StudentResultHeaderDTO> findStudentResultHeader(
             @Param("examId") Long examId,
