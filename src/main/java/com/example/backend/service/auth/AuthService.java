@@ -161,14 +161,12 @@ public class AuthService {
     }
 
     @Transactional
-    private ActivationResult createActivatedAccount(String originalSchoolId,
-                                                    String normalizedUsername,
-                                                    String email,
-                                                    String role,
-                                                    String ipAddress) {
-
+    public ActivationResult createActivatedAccount(String originalSchoolId,
+                                                   String normalizedUsername,
+                                                   String email,
+                                                   String role,
+                                                   String ipAddress) {
         try {
-
             String tempPassword = generateTempPassword();
 
             UserAccess user = new UserAccess();
@@ -187,7 +185,11 @@ public class AuthService {
 
             userAccessRepository.save(user);
 
+            System.out.println("EMAIL DEBUG: before sending to " + email);
+
             emailService.sendActivationEmail(email, normalizedUsername, tempPassword);
+
+            System.out.println("EMAIL DEBUG: after sending to " + email);
 
             logEvent(user, originalSchoolId, normalizedUsername,
                     "ACTIVATE_ACCOUNT", "SUCCESS", role + " account activated successfully", ipAddress);
@@ -203,10 +205,8 @@ public class AuthService {
 
         } catch (Exception e) {
             e.printStackTrace();
-            throw new RuntimeException("Failed to send activation email. Root cause: " + e.getMessage(), e);
+            throw new RuntimeException("Failed to activate account. Root cause: " + e.getMessage(), e);
         }
-
-
     }
 
     public LoginResult login(String schoolIdInput, String password, String ipAddress) {
