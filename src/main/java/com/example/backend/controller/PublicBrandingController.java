@@ -1,9 +1,14 @@
 package com.example.backend.controller;
 
 import com.example.backend.dto.core.BrandingResponse;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 @RestController
 @RequestMapping("/public")
@@ -22,5 +27,17 @@ public class PublicBrandingController {
         response.setProjectName("ExamGuard");
         response.setTagline("Secure Digital Examination Platform");
         return response;
+    }
+
+    @PostMapping("/upload-ai-file")
+    public ResponseEntity<String> uploadAiFile(@RequestParam("file") MultipartFile file) throws IOException {
+
+        Path dir = Paths.get(System.getProperty("user.dir"), "uploads", "ai");
+        Files.createDirectories(dir);
+
+        Path target = dir.resolve(file.getOriginalFilename());
+        file.transferTo(target.toFile());
+
+        return ResponseEntity.ok("Uploaded to " + target);
     }
 }
