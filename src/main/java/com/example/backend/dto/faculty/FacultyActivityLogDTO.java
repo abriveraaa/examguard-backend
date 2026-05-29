@@ -2,10 +2,11 @@ package com.example.backend.dto.faculty;
 
 import lombok.Getter;
 
+import java.io.Serializable;
 import java.time.OffsetDateTime;
 
 @Getter
-public class FacultyActivityLogDTO {
+public class FacultyActivityLogDTO implements Serializable {
 
     private String logType;
     private Long logId;

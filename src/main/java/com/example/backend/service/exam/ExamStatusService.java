@@ -14,10 +14,6 @@ public class ExamStatusService {
 
     private static final ZoneId MANILA_ZONE = ZoneId.of("Asia/Manila");
 
-    public ExamDisplayStatus getDisplayStatus(Exam exam) {
-        return getDisplayStatus(exam, null, null);
-    }
-
     public ExamDisplayStatus getDisplayStatus(
             Exam exam,
             Integer totalAssignedStudents,

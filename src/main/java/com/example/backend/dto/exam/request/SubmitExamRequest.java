@@ -1,13 +1,12 @@
 package com.example.backend.dto.exam.request;
 
-public class SubmitExamRequest {
+import lombok.Getter;
+import lombok.Setter;
+
+import java.io.Serializable;
+
+@Getter
+@Setter
+public class SubmitExamRequest implements Serializable {
     private Long attemptId;
-
-    public Long getAttemptId() {
-        return attemptId;
-    }
-
-    public void setAttemptId(Long attemptId) {
-        this.attemptId = attemptId;
-    }
 }

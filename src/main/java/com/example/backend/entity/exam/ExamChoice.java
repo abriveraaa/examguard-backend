@@ -1,10 +1,13 @@
 package com.example.backend.entity.exam;
 
 import jakarta.persistence.*;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import java.io.Serializable;
 
 @Entity
 @Table(name = "exam_choice")
-public class ExamChoice {
+public class ExamChoice implements Serializable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "exam_choice_choice_id_seq")
@@ -16,6 +19,7 @@ public class ExamChoice {
     @Column(name = "choice_id")
     private Long choiceId;
 
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "question_id", nullable = false)
     private ExamQuestion question;

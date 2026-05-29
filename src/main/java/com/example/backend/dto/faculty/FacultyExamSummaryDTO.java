@@ -4,11 +4,12 @@ import com.example.backend.entity.enums.ExamMode;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.io.Serializable;
 import java.time.OffsetDateTime;
 
 @Getter
 @Setter
-public class FacultyExamSummaryDTO {
+public class FacultyExamSummaryDTO implements Serializable {
 
     private Long examId;
     private String title;

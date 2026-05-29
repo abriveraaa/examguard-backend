@@ -3,9 +3,11 @@ package com.example.backend.dto.student.dashboard;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.io.Serializable;
+
 @Getter
 @Setter
-public class StudentResultSummaryDTO {
+public class StudentResultSummaryDTO implements Serializable {
 
     private Long examId;
     private String courseCode;

@@ -14,6 +14,15 @@ public interface ClassEnrollmentCacheRepository extends JpaRepository<ClassEnrol
     List<ClassEnrollmentCache> findByStudentId(String studentId);
 
     @Query("""
+    SELECT DISTINCT ce.studentId
+    FROM ClassEnrollmentCache ce
+    WHERE ce.classOfferingId IN :classOfferingIds
+""")
+    List<String> findStudentIdsByClassOfferingIds(
+            @Param("classOfferingIds") List<String> classOfferingIds
+    );
+
+    @Query("""
     SELECT co
     FROM ClassEnrollmentCache ce
     JOIN ClassOfferingCache co

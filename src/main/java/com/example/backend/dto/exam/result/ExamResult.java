@@ -1,6 +1,8 @@
 package com.example.backend.dto.exam.result;
 
-public class ExamResult {
+import java.io.Serializable;
+
+public class ExamResult implements Serializable {
 
     private boolean success;
     private String message;

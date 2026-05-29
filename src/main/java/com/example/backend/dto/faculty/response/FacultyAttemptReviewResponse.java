@@ -5,12 +5,13 @@ import com.example.backend.dto.faculty.FacultyAttemptViolationDTO;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.io.Serializable;
 import java.time.OffsetDateTime;
 import java.util.List;
 
 @Getter
 @Setter
-public class FacultyAttemptReviewResponse {
+public class FacultyAttemptReviewResponse implements Serializable {
 
     private Long attemptId;
     private Long examId;

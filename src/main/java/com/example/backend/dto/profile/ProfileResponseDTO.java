@@ -1,5 +1,6 @@
 package com.example.backend.dto.profile;
 
+import java.io.Serializable;
 import java.util.List;
 
 public record ProfileResponseDTO(
@@ -20,4 +21,4 @@ public record ProfileResponseDTO(
         String currentTerm,
         List<ProfileClassDTO> classes,
         List<ProfileActivityDTO> recentActivities
-) {}
+) implements Serializable {}

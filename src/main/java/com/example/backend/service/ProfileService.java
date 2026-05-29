@@ -22,13 +22,15 @@ import com.example.backend.repository.core.SystemActivityLogRepository;
 import com.example.backend.repository.core.UserAccessRepository;
 import lombok.RequiredArgsConstructor;
 import net.coobird.thumbnailator.Thumbnails;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.File;
-import java.nio.file.Path;
+import org.springframework.beans.factory.annotation.Value;
 import java.time.OffsetDateTime;
 import java.time.Period;
 import java.time.ZoneId;
@@ -52,8 +54,8 @@ public class ProfileService {
     private final ClassOfferingCacheRepository classOfferingCacheRepository;
     private final SystemActivityLogRepository systemActivityLogRepository;
 
-    private static final Path PROFILE_UPLOAD_DIR =
-            Path.of("uploads", "profiles");
+    @Value("${profile.upload.dir}")
+    private String profileUploadDir;
 
     private static final ZoneId MANILA_ZONE = ZoneId.of("Asia/Manila");
 
@@ -68,98 +70,95 @@ public class ProfileService {
             action = "VIEW_PROFILE",
             message = "User viewed profile"
     )
+    @Cacheable(value="profileMe", key="#schoolId")
     public ProfileResponseDTO getMyProfile(
-            String userId,
+            String schoolId,
             String role
     ) {
-        UserAccess user = findUser(userId);
-
-        String normalizedRole = normalizeRole(role);
-        String schoolId = user.getSchoolId();
+        UserAccess user = findUser(schoolId);
 
         CurrentTermDTO currentTerm = getCurrentTerm();
 
-        List<ProfileClassDTO> classes = buildClasses(normalizedRole, schoolId);
+        List<ProfileClassDTO> classes = buildClasses(role, schoolId);
 
-        List<ProfileActivityDTO> activities =
-                buildRecentActivities(schoolId);
+        List<ProfileActivityDTO> activities = buildRecentActivities(schoolId);
 
-        if ("STUDENT".equals(normalizedRole)) {
-            StudentProfileCache student = studentProfileCacheRepository
-                    .findByStudentId(schoolId)
-                    .orElseThrow(() -> new RuntimeException("Student profile not found for " + schoolId));
+        switch (role) {
+            case "STUDENT" -> {
+                StudentProfileCache student = studentProfileCacheRepository
+                        .findByStudentId(schoolId)
+                        .orElseThrow(() -> new RuntimeException("Student profile not found for " + schoolId));
 
-            return new ProfileResponseDTO(
-                    "STUDENT",
-                    fullName(student.getFirstName(), student.getLastName()),
-                    firstNonBlank(student.getEmailAddress(), user.getEmail()),
-                    student.getStudentId(),
-                    firstNonBlank(student.getCollegeName(), student.getCollegeCode()),
-                    student.getProgramName(),
-                    user.getUsername(),
-                    buildAccountStatus(user),
-                    formatDate(user.getCreatedAt()),
-                    buildTenureDuration(user.getCreatedAt()),
-                    buildPasswordStatus(user),
-                    formatDate(user.getUpdatedAt()),
-                    user.getProfileImageUrl(),
-                    currentTerm.getAcademicYear(),
-                    currentTerm.getTerm(),
-                    classes,
-                    activities
-            );
-        }
+                return new ProfileResponseDTO(
+                        "STUDENT",
+                        fullName(student.getFirstName(), student.getLastName()),
+                        firstNonBlank(student.getEmailAddress(), user.getEmail()),
+                        student.getStudentId(),
+                        firstNonBlank(student.getCollegeName(), student.getCollegeCode()),
+                        student.getProgramName(),
+                        user.getUsername(),
+                        buildAccountStatus(user),
+                        formatDate(user.getCreatedAt()),
+                        buildTenureDuration(user.getCreatedAt()),
+                        buildPasswordStatus(user),
+                        formatDate(user.getUpdatedAt()),
+                        user.getProfileImageUrl(),
+                        currentTerm.getAcademicYear(),
+                        currentTerm.getTerm(),
+                        classes,
+                        activities
+                );
+            }
+            case "FACULTY" -> {
+                FacultyProfileCache faculty = facultyProfileCacheRepository
+                        .findByEmployeeId(schoolId)
+                        .orElseThrow(() -> new RuntimeException("Faculty profile not found for " + schoolId));
 
-        if ("FACULTY".equals(normalizedRole)) {
-            FacultyProfileCache faculty = facultyProfileCacheRepository
-                    .findByEmployeeId(schoolId)
-                    .orElseThrow(() -> new RuntimeException("Faculty profile not found for " + schoolId));
+                return new ProfileResponseDTO(
+                        "FACULTY",
+                        fullName(faculty.getFirstName(), faculty.getLastName()),
+                        firstNonBlank(faculty.getEmailAddress(), user.getEmail()),
+                        faculty.getEmployeeId(),
+                        "Faculty",
+                        firstNonBlank(faculty.getStatus(), "Faculty Member"),
+                        user.getUsername(),
+                        buildAccountStatus(user),
+                        formatDate(user.getCreatedAt()),
+                        buildTenureDuration(user.getCreatedAt()),
+                        buildPasswordStatus(user),
+                        formatDate(user.getUpdatedAt()),
+                        user.getProfileImageUrl(),
+                        currentTerm.getAcademicYear(),
+                        currentTerm.getTerm(),
+                        classes,
+                        activities
+                );
+            }
+            case "ADMIN" -> {
+                AdminProfile admin = adminProfileRepository
+                        .findByEmployeeId(schoolId)
+                        .orElseThrow(() -> new RuntimeException("Admin profile not found for " + schoolId));
 
-            return new ProfileResponseDTO(
-                    "FACULTY",
-                    fullName(faculty.getFirstName(), faculty.getLastName()),
-                    firstNonBlank(faculty.getEmailAddress(), user.getEmail()),
-                    faculty.getEmployeeId(),
-                    "Faculty",
-                    firstNonBlank(faculty.getStatus(), "Faculty Member"),
-                    user.getUsername(),
-                    buildAccountStatus(user),
-                    formatDate(user.getCreatedAt()),
-                    buildTenureDuration(user.getCreatedAt()),
-                    buildPasswordStatus(user),
-                    formatDate(user.getUpdatedAt()),
-                    user.getProfileImageUrl(),
-                    currentTerm.getAcademicYear(),
-                    currentTerm.getTerm(),
-                    classes,
-                    activities
-            );
-        }
-
-        if ("ADMIN".equals(normalizedRole)) {
-            AdminProfile admin = adminProfileRepository
-                    .findByEmployeeId(schoolId)
-                    .orElseThrow(() -> new RuntimeException("Admin profile not found for " + schoolId));
-
-            return new ProfileResponseDTO(
-                    "ADMIN",
-                    fullName(admin.getFirstName(), admin.getLastName()),
-                    firstNonBlank(admin.getEmail(), user.getEmail()),
-                    admin.getEmployeeId(),
-                    "System Administration",
-                    "Administrator",
-                    user.getUsername(),
-                    buildAccountStatus(user),
-                    formatDate(user.getCreatedAt()),
-                    buildTenureDuration(user.getCreatedAt()),
-                    buildPasswordStatus(user),
-                    formatDate(user.getUpdatedAt()),
-                    user.getProfileImageUrl(),
-                    currentTerm.getAcademicYear(),
-                    currentTerm.getTerm(),
-                    classes,
-                    activities
-            );
+                return new ProfileResponseDTO(
+                        "ADMIN",
+                        fullName(admin.getFirstName(), admin.getLastName()),
+                        firstNonBlank(admin.getEmail(), user.getEmail()),
+                        admin.getEmployeeId(),
+                        "System Administration",
+                        "Administrator",
+                        user.getUsername(),
+                        buildAccountStatus(user),
+                        formatDate(user.getCreatedAt()),
+                        buildTenureDuration(user.getCreatedAt()),
+                        buildPasswordStatus(user),
+                        formatDate(user.getUpdatedAt()),
+                        user.getProfileImageUrl(),
+                        currentTerm.getAcademicYear(),
+                        currentTerm.getTerm(),
+                        classes,
+                        activities
+                );
+            }
         }
 
         throw new RuntimeException("Unsupported role: " + role);
@@ -170,6 +169,10 @@ public class ProfileService {
             action = "UPLOAD_PROFILE_PHOTO",
             message = "User uploaded profile photo"
     )
+    @CacheEvict(
+            value = {
+                    "profileMe",
+            }, key="#userId")
     public ImageUploadResponse uploadProfilePhoto(
             String userId,
             MultipartFile file
@@ -191,7 +194,7 @@ public class ProfileService {
 
             UserAccess user = findUser(userId);
 
-            File directory = PROFILE_UPLOAD_DIR.toFile();
+            File directory = new File(profileUploadDir);
 
             if (!directory.exists()) {
 

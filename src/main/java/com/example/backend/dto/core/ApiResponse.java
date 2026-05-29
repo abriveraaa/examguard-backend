@@ -1,6 +1,8 @@
 package com.example.backend.dto.core;
 
-public class ApiResponse {
+import java.io.Serializable;
+
+public class ApiResponse implements Serializable {
 
     private boolean success;
     private String message;

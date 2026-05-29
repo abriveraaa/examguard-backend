@@ -5,12 +5,13 @@ import com.example.backend.entity.enums.ExamMode;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.io.Serializable;
 import java.time.OffsetDateTime;
 import java.util.List;
 
 @Getter
 @Setter
-public class ExamTakingResponse {
+public class ExamTakingResponse implements Serializable {
 
     private Long attemptId;
     private Long examId;

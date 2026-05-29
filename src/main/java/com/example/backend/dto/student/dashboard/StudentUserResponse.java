@@ -1,6 +1,8 @@
 package com.example.backend.dto.student.dashboard;
 
-public class StudentUserResponse {
+import java.io.Serializable;
+
+public class StudentUserResponse implements Serializable {
 
     private String schoolId;
     private String username;

@@ -3,9 +3,11 @@ package com.example.backend.dto.faculty;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.io.Serializable;
+
 @Getter
 @Setter
-public class FacultyClassDTO {
+public class FacultyClassDTO implements Serializable {
 
     private String classOfferingId;
     private String courseCode;

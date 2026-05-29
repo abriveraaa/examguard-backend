@@ -1,5 +1,7 @@
 package com.example.backend.dto.faculty.students;
 
+import java.io.Serializable;
+
 public record FacultyStudentDTO(
         String studentId,
         String firstName,
@@ -18,4 +20,4 @@ public record FacultyStudentDTO(
         String courseDescription,
         String classOfferingId,
         String profileImageUrl
-) {}
+) implements Serializable { }

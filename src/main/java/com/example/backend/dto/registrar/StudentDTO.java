@@ -1,6 +1,8 @@
 package com.example.backend.dto.registrar;
 
-public class StudentDTO {
+import java.io.Serializable;
+
+public class StudentDTO implements Serializable {
     public String studentId;
     public String firstName;
     public String lastName;

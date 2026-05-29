@@ -2,10 +2,11 @@ package com.example.backend.dto.admin.monitoring;
 
 import lombok.Data;
 
+import java.io.Serializable;
 import java.time.OffsetDateTime;
 
 @Data
-public class AdminMonitoringLogsRequest {
+public class AdminMonitoringLogsRequest implements Serializable {
 
     private int page = 0;
     private int size = 20;

@@ -1,6 +1,8 @@
 package com.example.backend.dto.core;
 
-public class ActivationResult {
+import java.io.Serializable;
+
+public class ActivationResult implements Serializable {
 
     private boolean success;
     private String message;

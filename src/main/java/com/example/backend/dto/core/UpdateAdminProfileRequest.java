@@ -1,6 +1,8 @@
 package com.example.backend.dto.core;
 
-public class UpdateAdminProfileRequest {
+import java.io.Serializable;
+
+public class UpdateAdminProfileRequest implements Serializable {
 
     private String firstName;
     private String lastName;

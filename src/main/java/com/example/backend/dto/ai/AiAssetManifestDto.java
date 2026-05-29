@@ -1,8 +1,9 @@
 package com.example.backend.dto.ai;
 
+import java.io.Serializable;
 import java.util.List;
 
-public class AiAssetManifestDto {
+public class AiAssetManifestDto implements Serializable {
     private List<AiAssetDto> assets;
 
     public AiAssetManifestDto() {}

@@ -10,6 +10,7 @@ import com.example.backend.repository.cache.ClassEnrollmentCacheRepository;
 import com.example.backend.repository.exam.*;
 import com.example.backend.repository.FacultyRepository;
 import com.example.backend.service.exam.ExamStatusService;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -68,6 +69,7 @@ public class FacultyService {
             action = "VIEW_PROFILE_SUMMARY",
             message = "Faculty dashboard profile viewed"
     )
+    @Cacheable(value = "facultyProfile", key = "#employeeId")
     public FacultyProfileDTO getDashboardProfile(
             String employeeId,
             String role

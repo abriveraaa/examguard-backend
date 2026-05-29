@@ -2,11 +2,12 @@ package com.example.backend.dto.faculty.response;
 
 import lombok.Getter;
 
+import java.io.Serializable;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
 @Getter
-public class AnswerReviewTimelineDTO {
+public class AnswerReviewTimelineDTO implements Serializable {
 
     private final Long reviewLogId;
     private final String actionType;

@@ -7,12 +7,13 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.io.Serializable;
 import java.time.OffsetDateTime;
 
 @Data
 @Builder
 @NoArgsConstructor
-public class StudentUpcomingExamDTO {
+public class StudentUpcomingExamDTO implements Serializable {
     private Long examId;
     private String title;
     private String faculty;

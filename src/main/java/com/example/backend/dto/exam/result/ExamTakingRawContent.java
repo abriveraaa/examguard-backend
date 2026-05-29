@@ -4,10 +4,11 @@ import com.example.backend.entity.exam.Exam;
 import com.example.backend.entity.exam.ExamChoice;
 import com.example.backend.entity.exam.ExamQuestion;
 
+import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
 
-public class ExamTakingRawContent {
+public class ExamTakingRawContent implements Serializable {
 
     private Exam exam;
     private List<ExamQuestion> questions;

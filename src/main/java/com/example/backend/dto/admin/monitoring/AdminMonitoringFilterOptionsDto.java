@@ -2,11 +2,12 @@ package com.example.backend.dto.admin.monitoring;
 
 import lombok.Data;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
 @Data
-public class AdminMonitoringFilterOptionsDto {
+public class AdminMonitoringFilterOptionsDto implements Serializable {
 
     private List<String> roles = new ArrayList<>();
     private List<String> statuses = new ArrayList<>();

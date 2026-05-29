@@ -2,10 +2,11 @@ package com.example.backend.dto.admin.monitoring;
 
 import lombok.Data;
 
+import java.io.Serializable;
 import java.time.OffsetDateTime;
 
 @Data
-public class MonitoringFilterRequest {
+public class MonitoringFilterRequest implements Serializable {
 
     private String academicYear;
     private String term;

@@ -4,11 +4,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.io.Serializable;
 import java.time.OffsetDateTime;
 
 @Getter
 @Setter
-public class FacultyAttemptViolationDTO {
+public class FacultyAttemptViolationDTO implements Serializable {
 
     private Long violationId;
     private Long questionId;

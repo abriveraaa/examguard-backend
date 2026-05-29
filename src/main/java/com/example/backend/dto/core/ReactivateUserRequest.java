@@ -1,6 +1,8 @@
 package com.example.backend.dto.core;
 
-public class ReactivateUserRequest {
+import java.io.Serializable;
+
+public class ReactivateUserRequest implements Serializable {
 
     private String schoolId;
     private String role;

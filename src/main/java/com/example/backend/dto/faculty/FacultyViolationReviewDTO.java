@@ -3,11 +3,12 @@ package com.example.backend.dto.faculty;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.io.Serializable;
 import java.time.OffsetDateTime;
 
 @Getter
 @Setter
-public class FacultyViolationReviewDTO {
+public class FacultyViolationReviewDTO implements Serializable {
 
     private Long examId;
     private String examTitle;

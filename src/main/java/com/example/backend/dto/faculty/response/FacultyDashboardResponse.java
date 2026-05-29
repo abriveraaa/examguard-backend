@@ -4,12 +4,13 @@ import com.example.backend.dto.faculty.*;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.io.Serializable;
 import java.util.List;
 
 
 @Getter
 @Setter
-public class FacultyDashboardResponse {
+public class FacultyDashboardResponse implements Serializable {
 
     private FacultyProfileDTO profile;
     private FacultyDashboardStatsDTO stats;

@@ -1,6 +1,8 @@
 package com.example.backend.dto.auth;
 
-public class LoginResult {
+import java.io.Serializable;
+
+public class LoginResult implements Serializable {
 
     private boolean success;
     private String message;

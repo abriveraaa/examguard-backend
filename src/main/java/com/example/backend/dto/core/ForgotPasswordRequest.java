@@ -1,6 +1,8 @@
 package com.example.backend.dto.core;
 
-public class ForgotPasswordRequest {
+import java.io.Serializable;
+
+public class ForgotPasswordRequest implements Serializable {
 
     private String schoolId;
     private String email;

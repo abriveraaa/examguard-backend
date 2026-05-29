@@ -2,10 +2,11 @@ package com.example.backend.dto.admin.monitoring;
 
 import lombok.Data;
 
+import java.io.Serializable;
 import java.util.List;
 
 @Data
-public class MonitoringOverviewResponse {
+public class MonitoringOverviewResponse implements Serializable {
 
     private List<MetricCardDto> summaryCards;
     private List<ChartPointDto> concurrentUsersByRole;

@@ -5,11 +5,13 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.io.Serializable;
+
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class StudentDashboardStatsDTO {
+public class StudentDashboardStatsDTO implements Serializable {
     private Integer upcomingExamCount;
     private Integer completedExamCount;
     private Integer violationCount;

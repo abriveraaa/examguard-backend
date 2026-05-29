@@ -1,6 +1,8 @@
 package com.example.backend.dto.core;
 
-public class ActivateAccountRequest {
+import java.io.Serializable;
+
+public class ActivateAccountRequest implements Serializable {
 
     private String schoolId;
     private String email;

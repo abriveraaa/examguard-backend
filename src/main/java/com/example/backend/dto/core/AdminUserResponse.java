@@ -1,8 +1,9 @@
 package com.example.backend.dto.core;
 
+import java.io.Serializable;
 import java.time.LocalDate;
 
-public class AdminUserResponse {
+public class AdminUserResponse implements Serializable {
 
     private String schoolId;
     private String username;

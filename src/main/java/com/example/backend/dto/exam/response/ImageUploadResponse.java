@@ -1,6 +1,8 @@
 package com.example.backend.dto.exam.response;
 
-public class ImageUploadResponse {
+import java.io.Serializable;
+
+public class ImageUploadResponse implements Serializable {
 
     private boolean success;
     private String message;

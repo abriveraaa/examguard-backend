@@ -1,9 +1,10 @@
 package com.example.backend.dto.exam.response;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
-public class QuestionResponse {
+public class QuestionResponse implements Serializable {
 
     private Long questionId;
     private Integer questionNumber;

@@ -5,12 +5,13 @@ import com.example.backend.entity.exam.Exam;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.io.Serializable;
 import java.time.OffsetDateTime;
 
 
 @Getter
 @Setter
-public class StudentExamCardDTO {
+public class StudentExamCardDTO implements Serializable {
 
     private Long examId;
     private String title;

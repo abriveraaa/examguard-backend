@@ -1,6 +1,8 @@
 package com.example.backend.dto.core;
 
-public class DeactivateRequest {
+import java.io.Serializable;
+
+public class DeactivateRequest implements Serializable {
 
     private String reason;
     private String currentAdminId;

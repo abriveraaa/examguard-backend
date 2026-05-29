@@ -76,24 +76,18 @@ public class ReactivationService {
     public String reactivateSingleUser(
             @ActivityTarget(ActivityTargetType.TARGET_USER_ID)
             String schoolId,
-
             @ActivityTarget(ActivityTargetType.TARGET_ROLE)
             String role,
-
             String justification,
             UserAccess performedBy
     ) {
         Optional<UserAccess> userOpt = userAccessRepository.findBySchoolId(safe(schoolId));
 
-        if (userOpt.isEmpty()) {
-            return "User not found.";
-        }
+        if (userOpt.isEmpty()) { return "User not found."; }
 
         UserAccess user = userOpt.get();
 
-        if (user.isActive() && !user.isBlocked()) {
-            return "User is already active.";
-        }
+        if (user.isActive() && !user.isBlocked()) { return "User is already active."; }
 
         if (performedBy == null || performedBy.getUsername() == null || performedBy.getUsername().isBlank()) {
             return "Session user not found. Please login again.";

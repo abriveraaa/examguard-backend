@@ -1,6 +1,8 @@
 package com.example.backend.dto.core;
 
-public class LogoutRequest {
+import java.io.Serializable;
+
+public class LogoutRequest implements Serializable {
 
     private String sessionToken;
 

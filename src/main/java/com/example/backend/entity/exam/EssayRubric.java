@@ -1,5 +1,6 @@
 package com.example.backend.entity.exam;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -16,6 +17,7 @@ public class EssayRubric {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long rubricId;
 
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "question_id")
     private ExamQuestion question;

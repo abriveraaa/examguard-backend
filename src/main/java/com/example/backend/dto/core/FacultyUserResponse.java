@@ -1,6 +1,8 @@
 package com.example.backend.dto.core;
 
-public class FacultyUserResponse {
+import java.io.Serializable;
+
+public class FacultyUserResponse implements Serializable {
 
     private String schoolId;
     private String username;

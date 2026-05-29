@@ -621,7 +621,7 @@ GROUP BY
         LEFT JOIN FacultyProfileCache faculty
             ON faculty.employeeId = log.actorId
         
-        WHERE log.examId = :examId
+        WHERE log.examId = :examId AND log.module IN ('EXAM_TAKING', 'RESULTS','EXAM_REVIEW')
         ORDER BY log.occurredAt ASC
         """)
     List<FacultyActivityLogDTO> findSystemActivityLogsByExamId(

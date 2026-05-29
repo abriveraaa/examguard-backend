@@ -5,13 +5,14 @@ import com.example.backend.dto.exam.response.EssayRubricScoreResponse;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
 @Getter
 @Setter
-public class FacultyAttemptAnswerReviewDTO {
+public class FacultyAttemptAnswerReviewDTO implements Serializable {
 
     private Long answerId;
     private Long questionId;

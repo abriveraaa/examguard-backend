@@ -12,7 +12,6 @@ import com.example.backend.entity.exam.Exam;
 import com.example.backend.repository.exam.ExamRepository;
 import com.example.backend.service.auth.AuthService;
 import com.example.backend.service.report.StudentAnswerSheetReportService;
-import com.example.backend.service.student.StudentExamService;
 import com.example.backend.service.student.StudentService;
 import com.example.backend.service.exam.ExamService;
 import lombok.RequiredArgsConstructor;
@@ -30,7 +29,6 @@ public class StudentController {
 
     private final StudentService studentService;
     private final ExamService examTakingService;
-    private final StudentExamService studentExamService;
     private final StudentAnswerSheetReportService studentAnswerSheetReportService;
     private final ExamRepository examRepository;
     private final AuthService authService;
@@ -85,7 +83,7 @@ public class StudentController {
             throw new RuntimeException("Only students can access student exams.");
         }
 
-        return studentExamService.getStudentExamCards(user.getSchoolId());
+        return studentService.getStudentExamCards(user.getSchoolId());
     }
 
     @GetMapping("/exams/{examId}/results")

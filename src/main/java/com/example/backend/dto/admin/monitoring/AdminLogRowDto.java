@@ -4,12 +4,13 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.Getter;
 
+import java.io.Serializable;
 import java.time.OffsetDateTime;
 
 @Data
 @Getter
 @AllArgsConstructor
-public class AdminLogRowDto {
+public class AdminLogRowDto implements Serializable {
 
     private String source;
 

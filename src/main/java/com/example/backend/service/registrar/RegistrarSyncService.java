@@ -7,6 +7,7 @@ import com.example.backend.entity.core.RegistrarSyncLog;
 import com.example.backend.entity.core.UserAccess;
 import com.example.backend.repository.cache.*;
 import com.example.backend.repository.core.RegistrarSyncLogRepository;
+import com.example.backend.service.cache.RegistrarCacheService;
 import com.example.backend.utility.TimeUtil;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -28,6 +29,7 @@ public class RegistrarSyncService {
     private final ClassOfferingCacheRepository offeringRepo;
     private final ClassEnrollmentCacheRepository enrollmentRepo;
     private final FacultyLoadCacheRepository facultyLoadRepo;
+    private final RegistrarCacheService registrarCacheService;
 
     @TrackActivity(
             module = "REGISTRAR_SYNC",
@@ -63,6 +65,8 @@ public class RegistrarSyncService {
 
             registrarSyncLogRepository.save(log);
 
+            registrarCacheService.evictAfterRegistrarSync();
+
             return "Registrar sync completed successfully.";
 
         } catch (Exception e) {
@@ -94,8 +98,7 @@ public class RegistrarSyncService {
             entity.setYearLevel(dto.yearLevel);
             entity.setSectionName(dto.sectionName);
             entity.setScholasticStatus(defaultValue(dto.scholasticStatus, "REGULAR"));
-            entity.setSourceUpdatedAt(
-                    parseDateTime(dto.updatedAt) != null
+            entity.setSourceUpdatedAt(parseDateTime(dto.updatedAt) != null
                             ? parseDateTime(dto.updatedAt).toLocalDateTime()
                             : null
             );
@@ -202,6 +205,10 @@ public class RegistrarSyncService {
             facultyLoadRepo.save(entity);
         }
     }
+
+    // ==================
+    // HELPERS
+    // ==================
 
     private OffsetDateTime parseDateTime(String value) {
         try {

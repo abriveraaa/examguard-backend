@@ -3,6 +3,7 @@ package com.example.backend.dto.exam.request;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -10,7 +11,7 @@ import java.util.List;
 
 @Getter
 @Setter
-public class QuestionRequest {
+public class QuestionRequest implements Serializable {
 
     private Long questionId;
     private String questionType;

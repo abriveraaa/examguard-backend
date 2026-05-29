@@ -3,11 +3,12 @@ package com.example.backend.dto.exam.response;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.io.Serializable;
 import java.math.BigDecimal;
 
 @Getter
 @Setter
-public class EssayRubricScoreResponse {
+public class EssayRubricScoreResponse implements Serializable {
 
     private Long rubricId;
     private BigDecimal scorePercentage;

@@ -4,6 +4,7 @@ import com.example.backend.dto.core.BrandingResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -13,6 +14,9 @@ import java.nio.file.Paths;
 @RestController
 @RequestMapping("/public")
 public class PublicBrandingController {
+
+    @Value("${profile.upload.dir}")
+    private String profileUploadDir;
 
     @GetMapping("/branding")
     public BrandingResponse getBranding() {
@@ -32,7 +36,7 @@ public class PublicBrandingController {
     @PostMapping("/upload-profiles")
     public ResponseEntity<String> uploadAiFile(@RequestParam("file") MultipartFile file) throws IOException {
 
-        Path dir = Paths.get(System.getProperty("user.dir"), "uploads", "profiles");
+        Path dir = Paths.get(profileUploadDir);
         Files.createDirectories(dir);
 
         Path target = dir.resolve(file.getOriginalFilename());

@@ -3,8 +3,10 @@ package com.example.backend.dto.admin.monitoring;
 
 import lombok.Getter;
 
+import java.io.Serializable;
+
 @Getter
-public class ChartPointDto {
+public class ChartPointDto implements Serializable {
 
     private String label;
     private String category;

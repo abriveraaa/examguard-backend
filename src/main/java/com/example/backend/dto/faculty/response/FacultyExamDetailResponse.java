@@ -4,12 +4,13 @@ import com.example.backend.dto.faculty.FacultyClassDTO;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.io.Serializable;
 import java.time.OffsetDateTime;
 import java.util.List;
 
 @Getter
 @Setter
-public class FacultyExamDetailResponse {
+public class FacultyExamDetailResponse implements Serializable {
 
     private Long examId;
     private String title;

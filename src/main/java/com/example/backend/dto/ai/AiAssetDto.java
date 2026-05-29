@@ -3,9 +3,11 @@ package com.example.backend.dto.ai;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.io.Serializable;
+
 @Getter
 @Setter
-public class AiAssetDto {
+public class AiAssetDto implements Serializable {
     private String key;
     private String version;
     private String type;

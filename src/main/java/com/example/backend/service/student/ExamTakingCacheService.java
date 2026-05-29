@@ -1,4 +1,4 @@
-package com.example.backend.service.exam;
+package com.example.backend.service.student;
 
 import com.example.backend.dto.exam.result.ExamTakingRawContent;
 import com.example.backend.entity.exam.Exam;
@@ -37,13 +37,9 @@ public class ExamTakingCacheService {
     }
 
     @CacheEvict(value = "examTakingRawContent", key = "#examId")
-    public void evictCache(Long examId) {
-        // no body needed
-    }
+    public void evictCache(Long examId) { }
 
     private ExamTakingRawContent loadRawContentFromDatabase(Long examId) {
-        System.out.println("DB HIT - loading exam raw content: " + examId);
-
         Exam exam = examRepository.findById(examId)
                 .orElseThrow(() -> new RuntimeException("Exam not found."));
 

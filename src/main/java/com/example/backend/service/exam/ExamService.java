@@ -7,8 +7,8 @@ import com.example.backend.audit.TrackActivity;
 import com.example.backend.dto.exam.request.*;
 import com.example.backend.dto.exam.response.*;
 import com.example.backend.dto.exam.result.ExamResult;
-import com.example.backend.dto.faculty.request.ViolationDecisionRequest;
 import com.example.backend.dto.exam.result.ExamTakingRawContent;
+import com.example.backend.dto.faculty.request.ViolationDecisionRequest;
 import com.example.backend.dto.faculty.response.SimpleMessageResponse;
 import com.example.backend.entity.cache.ClassOfferingCache;
 import com.example.backend.entity.cache.FacultyProfileCache;
@@ -35,6 +35,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.beans.factory.annotation.Value;
+import lombok.RequiredArgsConstructor;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -54,7 +56,7 @@ import java.util.stream.Stream;
 import static com.example.backend.entity.enums.ExamStatus.*;
 
 @Service
-@AllArgsConstructor
+@RequiredArgsConstructor
 public class ExamService {
 
     // Database Repositories
@@ -74,7 +76,7 @@ public class ExamService {
     private final EmailService emailService;
     private final ExamAttemptRepository attemptRepository;
     private final ExamAttemptChoiceOrderRepository attemptChoiceOrderRepository;
-    private final ExamTakingCacheService examTakingCacheService;
+    private final ExamReadCacheService examReadCacheService;
     private final ExamViolationLogRepository violationLogRepository;
     private final ExamAnswerRepository answerRepository;
     private final EssayRubricRepository essayRubricRepository;
@@ -93,9 +95,12 @@ public class ExamService {
     private static final DateTimeFormatter DISPLAY_DATE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
     private static final ZoneId MANILA_ZONE = ZoneId.of("Asia/Manila");
 
-    // ====================
-    // DATABASE INTERACTION
-    // ====================
+    @Value("${exam.upload.dir}")
+    private String examUploadDir;
+
+    @Value("${evidence.upload.dir}")
+    private String evidenceUploadDir;
+
     @TrackActivity(
             module = "EXAM",
             action = "SAVE_DRAFT",
@@ -160,6 +165,11 @@ public class ExamService {
         syncQuestions(savedExam, request.getQuestions());
         saveViolationSettings(savedExam, request.getViolationSettings());
 
+        examReadCacheService.refreshStudentExamCachesAfterExamChange(
+                request.getClassOfferingIds(),
+                savedExam.getExamId()
+        );
+
         return new ExamResult(
                 true,
                 "Exam updated successfully.",
@@ -214,9 +224,9 @@ public class ExamService {
                 .map(ExamAssignment::getClassOfferingId)
                 .toList();
 
-        notifyStudents(savedExam, classOfferingIds, ExamStatus.PUBLISHED);
+        examReadCacheService.refreshStudentExamCachesAfterExamChange(classOfferingIds, examId);
 
-        examTakingCacheService.warmCache(exam.getExamId());
+        notifyStudents(savedExam, classOfferingIds, ExamStatus.PUBLISHED);
 
         return new ExamResult(true, "Exam published successfully.", examId, 0);
     }
@@ -254,14 +264,9 @@ public class ExamService {
 
         try {
 
-            if (request.getEvidenceMetadata() != null
-                    && !request.getEvidenceMetadata().isBlank()) {
-
+            if (request.getEvidenceMetadata() != null && !request.getEvidenceMetadata().isBlank()) {
                 ObjectMapper mapper = new ObjectMapper();
-
-                JsonNode metadataNode =
-                        mapper.readTree(request.getEvidenceMetadata());
-
+                JsonNode metadataNode = mapper.readTree(request.getEvidenceMetadata());
                 log.setEvidenceMetadata(metadataNode);
             }
 
@@ -350,7 +355,7 @@ public class ExamService {
             notifyStudents(exam, classOfferingIds, ExamStatus.CANCELLED);
         }
 
-        examTakingCacheService.evictCache(exam.getExamId());
+        examReadCacheService.evictExamTakingRawContent(examId);
 
         return new ExamResult(true, "Exam cancelled successfully.", examId, 0);
     }
@@ -843,7 +848,7 @@ public class ExamService {
         }
 
         ExamTakingRawContent rawContent =
-                examTakingCacheService.getRawContent(examId);
+                examReadCacheService.getExamTakingRawContent(examId);
 
         Optional<ExamAttempt> existingAttempt =
                 attemptRepository.findByExamIdAndStudentId(examId, schoolId);
@@ -1307,7 +1312,7 @@ public class ExamService {
 
         if (publishNow) {
             notifyStudents(savedExam, request.getClassOfferingIds(), ExamStatus.PUBLISHED);
-            examTakingCacheService.warmCache(exam.getExamId());
+            examReadCacheService.warmExamTakingRawContent(exam.getExamId());
         }
 
         return new ExamResult(
@@ -1814,9 +1819,7 @@ public class ExamService {
 
         try {
 
-            String uploadDir =
-                    System.getProperty("user.dir")
-                            + "/uploads/exams/";
+            String uploadDir = examUploadDir;
 
             File directory = new File(uploadDir);
 
@@ -1868,8 +1871,7 @@ public class ExamService {
                 );
             }
 
-            String imageUrl =
-                    "/uploads/exams/" + filename;
+            String imageUrl = "/uploads/exams/" + filename;
 
             return new ImageUploadResponse(
                     true,
@@ -1901,7 +1903,7 @@ public class ExamService {
         }
 
         try {
-            String uploadDir = System.getProperty("user.dir") + "/uploads/evidence/";
+            String uploadDir = evidenceUploadDir;
 
             File directory = new File(uploadDir);
 
@@ -1960,7 +1962,7 @@ public class ExamService {
         }
 
         ExamTakingRawContent rawContent =
-                examTakingCacheService.getRawContent(examId);
+                examReadCacheService.getExamTakingRawContent(examId);
 
         if (rawContent == null || rawContent.getExam() == null) {
             throw new ResponseStatusException(
@@ -2917,7 +2919,6 @@ public class ExamService {
         File file = new File(System.getProperty("user.dir") + "/uploads/exams/", filename);
 
         if (file.exists() && !file.delete()) {
-            System.out.println("Failed to delete exam image: " + file.getAbsolutePath());
         }
     }
 

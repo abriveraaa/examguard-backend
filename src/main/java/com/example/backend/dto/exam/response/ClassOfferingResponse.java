@@ -1,6 +1,8 @@
 package com.example.backend.dto.exam.response;
 
-public class ClassOfferingResponse {
+import java.io.Serializable;
+
+public class ClassOfferingResponse implements Serializable {
 
     private String classOfferingId;
     private String programCode;

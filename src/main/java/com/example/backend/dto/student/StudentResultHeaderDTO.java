@@ -2,8 +2,10 @@ package com.example.backend.dto.student;
 
 import lombok.Getter;
 
+import java.io.Serializable;
+
 @Getter
-public class StudentResultHeaderDTO {
+public class StudentResultHeaderDTO implements Serializable {
 
     private String courseCode;
     private String courseDescription;

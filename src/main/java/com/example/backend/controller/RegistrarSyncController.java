@@ -4,11 +4,14 @@ import com.example.backend.dto.core.ReactivateUserRequest;
 import com.example.backend.entity.core.UserAccess;
 import com.example.backend.repository.core.RegistrarSyncLogRepository;
 import com.example.backend.service.auth.AuthService;
+import com.example.backend.service.cache.RegistrarCacheService;
 import com.example.backend.service.core.ReactivationService;
 import com.example.backend.service.registrar.RegistrarSyncService;
+import lombok.AllArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
+@AllArgsConstructor
 @RequestMapping("/admin/registrar-sync")
 public class RegistrarSyncController {
 
@@ -16,16 +19,6 @@ public class RegistrarSyncController {
     private final RegistrarSyncService registrarSyncService;
     private final ReactivationService reactivationService;
     private final AuthService authService;
-
-    public RegistrarSyncController(RegistrarSyncService registrarSyncService,
-                                   AuthService authService,
-                                   RegistrarSyncLogRepository registrarSyncLogRepository,
-                                   ReactivationService reactivationService) {
-        this.registrarSyncService = registrarSyncService;
-        this.authService = authService;
-        this.registrarSyncLogRepository = registrarSyncLogRepository;
-        this.reactivationService = reactivationService;
-    }
 
     @PostMapping("/sync")
     public String initialSync(@RequestHeader("Authorization") String token) {

@@ -2,8 +2,10 @@ package com.example.backend.dto.core;
 
 import lombok.Data;
 
+import java.io.Serializable;
+
 @Data
-public class CurrentTermDTO {
+public class CurrentTermDTO implements Serializable {
     private String academicYear;
     private String term;
 

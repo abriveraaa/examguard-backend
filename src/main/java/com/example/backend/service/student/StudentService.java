@@ -3,22 +3,20 @@ package com.example.backend.service.student;
 import com.example.backend.audit.ActivityTarget;
 import com.example.backend.audit.ActivityTargetType;
 import com.example.backend.audit.TrackActivity;
-import com.example.backend.dto.core.CurrentTermDTO;
+import com.example.backend.dto.student.StudentExamCardDTO;
 import com.example.backend.dto.student.StudentResultHeaderDTO;
 import com.example.backend.dto.student.dashboard.*;
 import com.example.backend.dto.student.result.*;
 import com.example.backend.entity.cache.StudentProfileCache;
 import com.example.backend.entity.core.StudentDashboardView;
+import com.example.backend.entity.enums.ExamMode;
 import com.example.backend.entity.exam.*;
-import com.example.backend.repository.cache.ClassOfferingCacheRepository;
-import com.example.backend.repository.cache.StudentProfileCacheRepository;
 import com.example.backend.repository.core.StudentDashboardViewRepository;
 import com.example.backend.repository.exam.*;
 
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.data.domain.PageRequest;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -32,8 +30,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class StudentService {
 
-    private final StudentProfileCacheRepository studentProfileCacheRepository;
-    private final ClassOfferingCacheRepository classOfferingCacheRepository;
     private final ExamViolationLogRepository violationLogRepository;
     private final ExamRepository examRepository;
     private final StudentDashboardViewRepository dashboardViewRepository;
@@ -41,48 +37,34 @@ public class StudentService {
     private final ExamAnswerRepository examAnswerRepository;
     private final ExamChoiceRepository examChoiceRepository;
     private final EssayRubricRepository essayRubricRepository;
+    private final StudentReadCacheService studentReadCacheService;
+
+
+    // =====================
+    // STUDENT DASHBOARD
+    // =====================
 
     @TrackActivity(
             module = "STUDENT_DASHBOARD",
             action = "VIEW_DASHBOARD",
             message = "Student dashboard viewed"
     )
-    public StudentResponse getDashboard(
-            String userId,
-            String role)
-    {
-
+    public StudentResponse getDashboard(String userId, String role) {
         if (!"STUDENT".equalsIgnoreCase(role)) {
             throw new RuntimeException("Only students can access this dashboard.");
         }
 
-        StudentProfileCache profile = studentProfileCacheRepository
-                .findByStudentId(userId)
-                .orElseThrow(() -> new RuntimeException("Student profile not found."));
+        StudentProfileDTO profileDto =
+                studentReadCacheService.getProfile(userId);
 
-        List<CurrentTermDTO> currentTerm = classOfferingCacheRepository.findCurrentTerm();
-
-        String current_term = "";
-        if (!currentTerm.isEmpty()) {
-            CurrentTermDTO t = currentTerm.get(0);
-            current_term = t.getTerm() + ", AY " + t.getAcademicYear();
-        }
-
-        StudentProfileDTO profileDto = buildProfile(profile, current_term);
-
-        List<StudentUpcomingExamDTO> upcomingExams = examRepository.findPublishedAssignedExamsForStudent(profile.getStudentId());
+        List<StudentUpcomingExamDTO> upcomingExams =
+                studentReadCacheService.getUpcomingExams(userId);
 
         List<StudentResultSummaryDTO> resultSummary =
-                examRepository.findReleasedUnviewedResultsForStudent(
-                        profile.getStudentId(),
-                        PageRequest.of(0, 4)
-                );
+                studentReadCacheService.getResults(userId);
 
         List<StudentViolationSummaryDTO> violations =
-                violationLogRepository.findReviewedUnviewedViolationsForStudent(
-                        profile.getStudentId(),
-                        PageRequest.of(0, 4)
-                );
+                studentReadCacheService.getViolations(userId);
 
         StudentDashboardStatsDTO stats = StudentDashboardStatsDTO.builder()
                 .upcomingExamCount(upcomingExams.size())
@@ -97,26 +79,6 @@ public class StudentService {
                 .resultSummary(resultSummary)
                 .violations(violations)
                 .stats(stats)
-                .build();
-    }
-
-    private StudentProfileDTO buildProfile(StudentProfileCache profile, String currentTerm) {
-
-        return StudentProfileDTO.builder()
-                .firstName(profile.getFirstName())
-                .lastName(profile.getLastName())
-                .schoolId(profile.getStudentId())
-                .emailAddress(profile.getEmailAddress())
-                .programCode(profile.getProgramCode())
-                .programName(profile.getProgramName())
-                .yearLevel(profile.getYearLevel())
-                .sectionName(profile.getSectionName())
-                .collegeCode(profile.getCollegeCode())
-                .collegeName(profile.getCollegeName())
-                .currentTerm(currentTerm)
-                .integrityStatus("Good Standing")
-                .integritySubtitle("No unresolved major violation.")
-                .profileImageUrl(null)
                 .build();
     }
 
@@ -255,6 +217,29 @@ public class StudentService {
     }
 
 
+    // ==================
+    // EXAM LIST
+    // ==================
+
+    @TrackActivity(
+            module = "STUDENT_EXAMS",
+            action = "VIEW_EXAM_CARDS",
+            message = "Student viewed exam cards"
+    )
+    public List<StudentExamCardDTO> getStudentExamCards(String studentId) {
+        OffsetDateTime now = OffsetDateTime.now();
+
+        List<StudentExamCardDTO> exams =
+                studentReadCacheService.getStudentExams(studentId);
+
+        for (StudentExamCardDTO exam : exams) {
+            String status = computeStatus(exam, now);
+            exam.setStatus(status);
+            exam.setActionable(isActionable(status));
+        }
+
+        return exams;
+    }
 
 
     // ==================
@@ -392,6 +377,60 @@ public class StudentService {
         }
 
         return question.getCorrectAnswer();
+    }
+
+    private String computeStatus(StudentExamCardDTO exam, OffsetDateTime now) {
+
+        String attemptStatus = exam.getAttemptStatus();
+
+        if (Boolean.TRUE.equals(exam.getResultsReleased())) {
+            return "RESULTS RELEASED";
+        }
+
+        if ("SUBMITTED".equalsIgnoreCase(attemptStatus)
+                || "AUTO_SUBMITTED".equalsIgnoreCase(attemptStatus)) {
+            return "PENDING REVIEW";
+        }
+
+        OffsetDateTime start = exam.getStartDateTime();
+        OffsetDateTime end = exam.getEndDateTime();
+
+        if (start == null || end == null) {
+            return "UPCOMING";
+        }
+
+        int durationMinutes =
+                exam.getDurationMinutes() == null
+                        ? 60
+                        : exam.getDurationMinutes();
+
+        OffsetDateTime effectiveEnd =
+                exam.getMode() == ExamMode.SYNCHRONOUS
+                        ? start.plusMinutes(durationMinutes)
+                        : end;
+
+        if (now.isBefore(start)) {
+            return "UPCOMING";
+        }
+
+        if ("IN_PROGRESS".equalsIgnoreCase(attemptStatus)) {
+            return now.isBefore(effectiveEnd)
+                    ? "ONGOING"
+                    : "DID NOT TAKE";
+        }
+
+        if (now.isBefore(effectiveEnd)) {
+            return "ONGOING";
+        }
+
+        return "DID NOT TAKE";
+    }
+
+    private Boolean isActionable(String status) {
+        return switch (status) {
+            case "ONGOING", "RESULTS RELEASED" -> true;
+            default -> false;
+        };
     }
 
 }

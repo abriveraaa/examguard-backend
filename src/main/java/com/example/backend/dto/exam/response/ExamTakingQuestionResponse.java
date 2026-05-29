@@ -5,12 +5,13 @@ import com.example.backend.entity.enums.QuestionType;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.List;
 
 @Getter
 @Setter
-public class ExamTakingQuestionResponse {
+public class ExamTakingQuestionResponse implements Serializable {
     private Long questionId;
     private QuestionType questionType;
     private String questionText;

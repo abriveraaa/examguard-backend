@@ -1,6 +1,8 @@
 package com.example.backend.dto.core;
 
-public class ChangePasswordRequest {
+import java.io.Serializable;
+
+public class ChangePasswordRequest implements Serializable {
 
     private String schoolId;
     private String currentPassword;

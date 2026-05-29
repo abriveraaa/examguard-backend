@@ -1,10 +1,12 @@
 package com.example.backend.entity.exam;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.example.backend.entity.enums.QuestionType;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.io.Serializable;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -14,7 +16,7 @@ import java.util.List;
 @Getter
 @Setter
 @Table(name = "exam_question")
-public class ExamQuestion {
+public class ExamQuestion implements Serializable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "exam_question_question_id_seq")
@@ -26,6 +28,7 @@ public class ExamQuestion {
     @Column(name = "question_id")
     private Long questionId;
 
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "exam_id", nullable = false)
     private Exam exam;

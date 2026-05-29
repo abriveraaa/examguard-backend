@@ -1,6 +1,8 @@
 package com.example.backend.dto.exam.response;
 
-public class ChoiceResponse {
+import java.io.Serializable;
+
+public class ChoiceResponse implements Serializable {
 
     private Long choiceId;
     private String choiceText;
