@@ -15,6 +15,8 @@ public class StudentEvictCacheService {
         cache.evict("studentDashboard", schoolId);
         cache.evict("studentExams", schoolId);
         cache.evict("studentById", schoolId);
+        cache.evict("studentDashboardUpcomingExams", schoolId);
+        cache.evict("studentDashboardResults", schoolId);
     }
 
     public void evictAllStudents() {
