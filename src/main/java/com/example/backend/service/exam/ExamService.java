@@ -24,6 +24,7 @@ import com.example.backend.repository.cache.*;
 import com.example.backend.repository.core.AdminProfileRepository;
 import com.example.backend.entity.enums.ExamStatus;
 import com.example.backend.service.core.EmailService;
+import com.example.backend.service.student.StudentEvictCacheService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
@@ -84,6 +85,7 @@ public class ExamService {
     private final ExamAnswerReviewLogRepository reviewLogRepository;
     private final ClassEnrollmentCacheRepository classEnrollmentCacheRepository;
     private final ExamWorkspaceRepository examWorkspaceRepository;
+    private final StudentEvictCacheService studentEvictCacheService;
 
     private final Gson gson = new Gson();
 
@@ -734,53 +736,14 @@ public class ExamService {
 
         autoMarkReviewedIfNoManualReviewNeeded(attempt);
 
+        studentEvictCacheService.evictStudent(studentId);
+
         return new ExamResult(
                 true,
                 "Exam submitted successfully.",
                 attempt.getExamId(),
                 1
         );
-    }
-
-    private String upsertFeedbackBlock(
-            String existing,
-            String blockTitle,
-            String newText
-    ) {
-        String safeText = newText == null || newText.isBlank()
-                ? "No feedback provided."
-                : newText.trim();
-
-        String newBlock = "[" + blockTitle + "]\n" + safeText;
-
-        if (existing == null || existing.isBlank()) {
-            return newBlock;
-        }
-
-        String startMarker = "[" + blockTitle + "]";
-        int start = existing.indexOf(startMarker);
-
-        if (start < 0) {
-            return existing.trim() + "\n\n" + newBlock;
-        }
-
-        int nextBlock = existing.indexOf("\n\n[", start + startMarker.length());
-
-        if (nextBlock < 0) {
-            return (
-                    existing.substring(0, start).trim() +
-                            "\n\n" +
-                            newBlock
-            ).trim();
-        }
-
-        return (
-                existing.substring(0, start).trim() +
-                        "\n\n" +
-                        newBlock +
-                        "\n\n" +
-                        existing.substring(nextBlock).trim()
-        ).trim();
     }
 
     @TrackActivity(
