@@ -18,6 +18,7 @@ public class CacheDebugController {
 
     private final CacheManager cacheManager;
     private final RedisConnectionFactory redisConnectionFactory;
+    private final StudentEvictCacheService studentEvictCacheService;
 
     @GetMapping("/debug/cache")
     public Map<String, Object> cacheDebug() {
@@ -67,10 +68,11 @@ public class CacheDebugController {
 
     @GetMapping("/debug/cache/evict/{studentId}")
     public String evictStudent(
-            @PathVariable String studentId,
-            StudentEvictCacheService service
+            @PathVariable String studentId
     ) {
-        service.evictStudent(studentId);
+
+        studentEvictCacheService.evictStudent(studentId);
+
         return "evicted";
     }
 }
