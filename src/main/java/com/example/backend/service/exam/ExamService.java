@@ -736,6 +736,7 @@ public class ExamService {
 
         autoMarkReviewedIfNoManualReviewNeeded(attempt);
 
+        System.out.println("SUBMIT HIT IN RAILWAY: " + studentId);
         studentEvictCacheService.evictStudent(studentId);
 
         return new ExamResult(
