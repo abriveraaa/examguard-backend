@@ -114,7 +114,7 @@ public class StudentService {
             action = "VIEW_EXAM_RESULT",
             message = "Student viewed exam result"
     )
-    @Transactional(readOnly = true)
+    @Transactional
     public StudentExamResultResponse getStudentExamResult(
             @ActivityTarget(ActivityTargetType.EXAM_ID)
             Long examId,
