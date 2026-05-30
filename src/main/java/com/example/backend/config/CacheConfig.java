@@ -66,7 +66,7 @@ public class CacheConfig {
         // =============
         // EXAMS
         // =============
-        cacheConfigs.put("studentExamsRaw", defaultConfig.entryTtl(Duration.ofMinutes(10)));
+        cacheConfigs.put("studentExamsRaw", defaultConfig.entryTtl(Duration.ofDays(7)));
         cacheConfigs.put("examTakingRawContent", defaultConfig.entryTtl(Duration.ofDays(7)));
 
 
@@ -74,15 +74,15 @@ public class CacheConfig {
         // FACULTY
         // =============
 
-        cacheConfigs.put("allStudents", defaultConfig.entryTtl(Duration.ofMinutes(10)));
-        cacheConfigs.put("allFaculty", defaultConfig.entryTtl(Duration.ofMinutes(10)));
-        cacheConfigs.put("studentById", defaultConfig.entryTtl(Duration.ofMinutes(10)));
-        cacheConfigs.put("facultyById", defaultConfig.entryTtl(Duration.ofMinutes(10)));
-        cacheConfigs.put("studentDashboard", defaultConfig.entryTtl(Duration.ofMinutes(10)));
-        cacheConfigs.put("studentExams", defaultConfig.entryTtl(Duration.ofMinutes(10)));
+        cacheConfigs.put("allStudents", defaultConfig.entryTtl(Duration.ofDays(10)));
+        cacheConfigs.put("allFaculty", defaultConfig.entryTtl(Duration.ofDays(10)));
+        cacheConfigs.put("studentById", defaultConfig.entryTtl(Duration.ofDays(10)));
+        cacheConfigs.put("facultyById", defaultConfig.entryTtl(Duration.ofDays(10)));
+        cacheConfigs.put("studentDashboard", defaultConfig.entryTtl(Duration.ofDays(10)));
+        cacheConfigs.put("studentExams", defaultConfig.entryTtl(Duration.ofDays(10)));
         cacheConfigs.put("profileMe", defaultConfig.entryTtl(Duration.ofDays(1)));
-        cacheConfigs.put("facultyProfile", defaultConfig.entryTtl(Duration.ofHours(12)));
-        cacheConfigs.put("facultyDashboard", defaultConfig.entryTtl(Duration.ofMinutes(10)));
+        cacheConfigs.put("facultyProfile", defaultConfig.entryTtl(Duration.ofDays(12)));
+        cacheConfigs.put("facultyDashboard", defaultConfig.entryTtl(Duration.ofDays(10)));
         cacheConfigs.put("adminMonitoringSummary", defaultConfig.entryTtl(Duration.ofSeconds(30)));
 
         return RedisCacheManager.builder(connectionFactory)
