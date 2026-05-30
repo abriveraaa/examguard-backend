@@ -226,7 +226,7 @@ public class ExamService {
                 .map(ExamAssignment::getClassOfferingId)
                 .toList();
 
-        examReadCacheService.refreshStudentExamCachesAfterExamChange(classOfferingIds, examId);
+        studentEvictCacheService.evictAllStudents();
 
         notifyStudents(savedExam, classOfferingIds, ExamStatus.PUBLISHED);
 
@@ -1277,6 +1277,7 @@ public class ExamService {
         if (publishNow) {
             notifyStudents(savedExam, request.getClassOfferingIds(), ExamStatus.PUBLISHED);
             examReadCacheService.warmExamTakingRawContent(exam.getExamId());
+            studentEvictCacheService.evictAllStudents();
         }
 
         return new ExamResult(
@@ -1583,6 +1584,8 @@ public class ExamService {
                     .toList();
 
             notifyStudents(savedExam, classOfferingIds, ExamStatus.RESULTS_RELEASED);
+
+            studentEvictCacheService.evictAllStudents();
 
             return new SimpleMessageResponse(
                     true,
