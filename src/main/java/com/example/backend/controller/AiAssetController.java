@@ -55,6 +55,7 @@ public class AiAssetController {
     private String getBaseUrl() {
         return ServletUriComponentsBuilder
                 .fromCurrentContextPath()
+                .scheme("https")
                 .build()
                 .toUriString();
     }
