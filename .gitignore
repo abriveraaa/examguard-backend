@@ -10,6 +10,12 @@ logs/
 uploads/
 temp/
 
+# Uploaded files
+/uploads/*
+!/uploads/.gitkeep
+!/uploads/ai/
+!/uploads/ai/.gitkeep
+
 .env
 
 src/main/resources/application-local.properties
