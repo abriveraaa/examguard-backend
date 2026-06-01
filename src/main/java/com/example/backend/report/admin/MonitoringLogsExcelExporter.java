@@ -86,14 +86,7 @@ public class MonitoringLogsExcelExporter {
             }
 
             for (int i = 0; i < headers.length; i++) {
-                sheet.autoSizeColumn(i);
-
-                int currentWidth = sheet.getColumnWidth(i);
-                int maxWidth = 9000;
-
-                if (currentWidth > maxWidth) {
-                    sheet.setColumnWidth(i, maxWidth);
-                }
+                sheet.setColumnWidth(i, 6000);
             }
 
             sheet.createFreezePane(0, 6);
@@ -374,6 +367,10 @@ public class MonitoringLogsExcelExporter {
     }
 
     private String buildFilterSummary(AdminMonitoringLogsRequest request) {
+        if (request == null) {
+            return "Range: - | Search: - | Role: - | Status: - | Action: - | Module: - | Severity: - | Violation Type: -";
+        }
+
         return "Range: " + safe(request.getRange()) +
                 " | Search: " + safe(request.getSearch()) +
                 " | Role: " + safe(request.getRole()) +

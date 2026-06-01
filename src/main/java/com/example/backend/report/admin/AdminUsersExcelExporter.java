@@ -102,11 +102,12 @@ public class AdminUsersExcelExporter {
                 }
             }
 
+            int[] widths = studentReport
+                    ? new int[]{4500, 4500, 7000, 9000, 3500, 4000, 2500, 5000, 5000}
+                    : new int[]{4500, 4500, 7000, 9000, 5000, 5000};
+
             for (int i = 0; i < headers.length; i++) {
-                sheet.autoSizeColumn(i);
-                if (sheet.getColumnWidth(i) > 9000) {
-                    sheet.setColumnWidth(i, 9000);
-                }
+                sheet.setColumnWidth(i, widths[i]);
             }
 
             sheet.createFreezePane(0, 6);
@@ -137,6 +138,9 @@ public class AdminUsersExcelExporter {
     }
 
     private String buildFilterSummary(AdminUsersExportRequest request) {
+        if (request == null) {
+            return "Role: - | Status: - | Keyword: - | Reactivation: -";
+        }
 
         return "Role: " + safe(request.getRole()) +
                 " | Status: " + safe(request.getStatus()) +

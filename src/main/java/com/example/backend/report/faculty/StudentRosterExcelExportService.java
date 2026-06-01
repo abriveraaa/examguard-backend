@@ -110,8 +110,10 @@ public class StudentRosterExcelExportService {
                         );
             }
 
-            for(int i=0;i<columns.length;i++){
-                sheet.autoSizeColumn(i);
+            int[] widths = {4500, 7000, 9000, 7000, 4000, 2500, 4000};
+
+            for (int i = 0; i < columns.length; i++) {
+                sheet.setColumnWidth(i, widths[i]);
             }
 
             workbook.write(
