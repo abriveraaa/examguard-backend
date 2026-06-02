@@ -1,7 +1,10 @@
 package com.example.backend.dto.core;
 
+import lombok.Getter;
+
 import java.io.Serializable;
 
+@Getter
 public class UserDetailsResponse implements Serializable {
 
     private String schoolId;
@@ -48,18 +51,4 @@ public class UserDetailsResponse implements Serializable {
         this.failedAttempts = failedAttempts;
         this.lastLogin = lastLogin;
     }
-
-    public String getSchoolId() { return schoolId; }
-    public String getUsername() { return username; }
-    public String getFullName() { return fullName; }
-    public String getEmail() { return email; }
-    public String getRole() { return role; }
-    public String getAccountStatus() { return accountStatus; }
-    public String getSystemAccess() { return systemAccess; }
-    public Integer getFailedAttempts() { return failedAttempts; }
-    public String getLastLogin() { return lastLogin; }
-    public String getCollegeName() { return collegeName; }
-    public String getProgramName() { return programName; }
-    public Integer getYearLevel() { return yearLevel; }
-    public String getSectionName() { return sectionName; }
 }

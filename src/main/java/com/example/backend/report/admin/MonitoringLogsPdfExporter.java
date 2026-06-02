@@ -36,11 +36,7 @@ public class MonitoringLogsPdfExporter {
 
             PdfWriter writer = PdfWriter.getInstance(document, out);
 
-            writer.setPageEvent(
-                    new MonitoringLogsPageEvent(
-                            buildGeneratedByText(user)
-                    )
-            );
+            writer.setPageEvent(new MonitoringLogsPageEvent(buildGeneratedByText(user)));
 
             document.open();
 

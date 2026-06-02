@@ -486,12 +486,6 @@ public class AuthService {
             return false;
         }
 
-        if (user.isBlocked()) {
-            logEvent(null, originalSchoolId, normalizedUsername,
-                    "FORGOT_PASSWORD", "FAILED", "Account is blocked. Please contact admin.", ipAddress);
-            return false;
-        }
-
         boolean studentValid =
                 studentProfileCacheRepository
                         .findByStudentIdAndEmailAddressAndBirthDate(
@@ -518,6 +512,8 @@ public class AuthService {
             return false;
         }
 
+        String previousStatus = user.isBlocked() ? "BLOCKED" : "ACTIVE";
+
         String tempPassword = generateTempPassword();
         String email = resolveUserEmail(user);
 
@@ -528,8 +524,6 @@ public class AuthService {
         user.setBlockedAt(null);
         user.setTempPasswordSentAt(TimeUtil.now());
         user.setTempPasswordExpiry(TimeUtil.now().plusMinutes(5));
-
-        String previousStatus = user.isBlocked() ? "BLOCKED" : "ACTIVE";
 
         userAccessRepository.save(user);
 

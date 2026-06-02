@@ -38,20 +38,12 @@ public class ReportPdfUtil {
     ) throws Exception {
 
         Document document = new Document(
-                config.getPageSize(),
-                35f,
-                35f,
-                45f,
-                65f
+                config.getPageSize(), 35f, 35f, 45f, 65f
         );
 
-        PdfWriter writer =
-                PdfWriter.getInstance(document, outputStream);
+        PdfWriter writer = PdfWriter.getInstance(document, outputStream);
 
-        writer.setPageEvent(new ReportFrontPageOnlyEvent(
-                config.getCollegeOffering(),
-                config.getGeneratedByText()
-        ));
+        writer.setPageEvent(new ReportFrontPageOnlyEvent( config.getCollegeOffering(), config.getGeneratedByText()));
 
         document.open();
 
